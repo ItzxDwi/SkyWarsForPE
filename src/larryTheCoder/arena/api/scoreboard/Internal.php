@@ -35,7 +35,7 @@ use larryTheCoder\arena\api\impl\ArenaState;
 use larryTheCoder\arena\api\impl\Scoreboard;
 use larryTheCoder\arena\api\utils\StandardScoreboard;
 use larryTheCoder\utils\Utils;
-use pocketmine\Player;
+use pocketmine\player\Player;
 use pocketmine\utils\Config;
 use pocketmine\utils\TextFormat;
 
@@ -48,20 +48,16 @@ class Internal implements Scoreboard {
 	private const EMPTY_CACHE = ["§0\e", "§1\e", "§2\e", "§3\e", "§4\e", "§5\e", "§6\e", "§7\e", "§8\e", "§9\e", "§a\e", "§b\e", "§c\e", "§d\e", "§e\e"];
 
 	/** @var Player[] */
-	private $scoreboards = [];
-	/** @var Config */
-	private $config;
-	/** @var Arena */
-	private $arena;
+	private array $scoreboards = [];
+	private Config $config;
+	private Arena $arena;
 	/** @var string[][] */
-	private $networkBound = [];
-	/** @var string */
-	private $status = TextFormat::GREEN . "Waiting...";
-	/** @var int */
-	private $timeLeft = 0;
+	private string $networkBound = [];
+	private string $status = TextFormat::GREEN . "Waiting...";
+	private int $timeLeft = 0;
 
 	/** @var int[][] */
-	private $lastState = [];
+	private array $lastState = [];
 
 	public function __construct(Arena $arena, Config $defaultConf){
 		$this->arena = $arena;
