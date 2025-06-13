@@ -30,7 +30,7 @@ declare(strict_types = 1);
 
 namespace larryTheCoder\forms;
 
-use pocketmine\Player;
+use pocketmine\player\Player;
 
 class FormQueue {
 
