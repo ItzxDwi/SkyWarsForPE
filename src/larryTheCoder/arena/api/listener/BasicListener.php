@@ -42,7 +42,7 @@ use pocketmine\event\inventory\InventoryOpenEvent;
 use pocketmine\event\entity\EntityItemPickupEvent;
 use pocketmine\event\Listener;
 use pocketmine\event\player\PlayerChatEvent;
-use pocketmine\event\player\PlayerCommandPreprocessEvent;
+use pocketmine\event\server\CommandEvent;
 use pocketmine\event\player\PlayerDropItemEvent;
 use pocketmine\event\player\PlayerExhaustEvent;
 use pocketmine\event\player\PlayerInteractEvent;
@@ -256,14 +256,14 @@ abstract class BasicListener implements Listener {
 	 * @param PlayerCommandPreprocessEvent $ev
 	 * @priority NORMAL
 	 */
-	public function onCommand(PlayerCommandPreprocessEvent $ev): void{
-		$arena = $this->getArena($ev->getPlayer());
+	public function onCommand(CommandEvent $ev): void{
+	  $sender = $event->getSender();
+	  if(!$sender instanceof Player) return;
+
+		$arena = $this->getArena($sender);
 		if($arena === null) return;
 
-		$cmd = strtolower($ev->getMessage());
-		if($cmd[0] === '/'){
-			$arena->getEventListener()->onPlayerExecuteCommand($ev);
-		}
+	  $arena->getEventListener()->onPlayerExecuteCommand($ev);
 	}
 
 	/**
