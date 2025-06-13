@@ -30,16 +30,16 @@ namespace larryTheCoder\utils\npc;
 
 use larryTheCoder\arena\api\translation\TranslationContainer;
 use larryTheCoder\SkyWarsPE;
+use pocketmine\entity\Location;
 use pocketmine\entity\Human;
 use pocketmine\entity\Skin;
 use pocketmine\event\entity\EntityDamageEvent;
-use pocketmine\level\Level;
-use pocketmine\level\particle\FloatingTextParticle;
-use pocketmine\nbt\BigEndianNBTStream;
+use pocketmine\world\World;
+use pocketmine\world\particle\FloatingTextParticle;
+use pocketmine\nbt\BigEndianNbtSerializer;
 use pocketmine\nbt\tag\CompoundTag;
-use pocketmine\nbt\tag\StringTag;
 use pocketmine\network\mcpe\protocol\MoveActorAbsolutePacket;
-use pocketmine\Player;
+use pocketmine\player\Player;
 use pocketmine\Server;
 
 /**
@@ -55,27 +55,19 @@ class FakeHuman extends Human {
 	/** @var int */
 	private $levelPedestal;
 
-	public function __construct(Level $level, CompoundTag $nbt, int $pedestalLevel){
+	public function __construct(Location $location, ?CompoundTag $nbt = null, int $pedestalLevel){
 		$nbtNew = new BigEndianNBTStream();
-		$compound = $nbtNew->readCompressed(@stream_get_contents(SkyWarsPE::getInstance()->getResource("metadata-fix.dat")));
+		$compound = $nbtNew->read(@stream_get_contents(SkyWarsPE::getInstance()->getResource("metadata-fix.dat")))->mustGetCompoundTag();
 		if(!($compound instanceof CompoundTag)){
 			throw new \RuntimeException("Unable to read skin metadata from SkyWarsForPE resources folder, corrupted build?");
 		}
 
-		$skinTag = $compound->getCompoundTag("Skin");
-		$skin = new Skin(
-			$skinTag->getString("Name"),
-			$skinTag->hasTag("Data", StringTag::class) ? $skinTag->getString("Data") : $skinTag->getByteArray("Data"), //old data (this used to be saved as a StringTag in older versions of PM)
-			$skinTag->getByteArray("CapeData", ""),
-			$skinTag->getString("GeometryName", ""),
-			$skinTag->getByteArray("GeometryData", "")
-		);
-		$this->setSkin($skin);
+		$this->setSkin(Human::parseSkinNBT($compound));
 
-		parent::__construct($level, $nbt);
+		parent::__construct($location, $nbt);
 
 		$this->setCanSaveWithChunk(false);
-		$this->setImmobile(false);
+		$this->setNoClientPredictions(false);
 		$this->setScale(0.8);
 		$this->setNameTagAlwaysVisible(false);
 
@@ -85,20 +77,20 @@ class FakeHuman extends Human {
 	}
 
 	public function attack(EntityDamageEvent $source): void{
-		$source->setCancelled();
+		$source->cancel();
 	}
 
 	public function onUpdate(int $currentTick): bool{
-		if($this->isClosed()){
+		if($this->closed){
 			return false;
 		}
 
 		if($currentTick % 3 === 0){
 			// Look at the player, and sent the packet only
 			// to the player who looked at it
-			foreach($this->getLevel()->getPlayers() as $playerName){
-				if($playerName->distance($this) <= 15){
-					$this->lookAtInto($playerName);
+			foreach($this->getWorlx()->getPlayers() as $player){
+				if($player->getPosition()->distance($this->getPosition()) <= 15){
+					$this->lookAtInto($player);
 				}
 			}
 		}elseif($currentTick % 200 === 0){
@@ -122,21 +114,7 @@ class FakeHuman extends Human {
 		// Send the skin (Only use the .dat skin data)
 		if(file_exists(Server::getInstance()->getDataPath() . "players/" . strtolower($object[0]) . ".dat")){
 			$nbt = Server::getInstance()->getOfflinePlayerData($object[0]);
-			$skin = $nbt->getCompoundTag("Skin");
-			if($skin !== null){
-				$skin = new Skin(
-					$skin->getString("Name"),
-					$skin->hasTag("Data", StringTag::class) ? $skin->getString("Data") : $skin->getByteArray("Data"), //old data (this used to be saved as a StringTag in older versions of PM)
-					$skin->getByteArray("CapeData", ""),
-					$skin->getString("GeometryName", ""),
-					$skin->getByteArray("GeometryData", "")
-				);
-				try{
-					$skin->validate();
-					$this->setSkin($skin);
-				}catch(\Exception $ignored){
-				}
-			}
+			$this->setSkin(Human::parseSkinNBT($nbt));
 		}
 
 		// The text packets
@@ -154,34 +132,35 @@ class FakeHuman extends Human {
 	 * @param Player $target
 	 */
 	public function lookAtInto(Player $target): void{
-		$horizontal = sqrt(($target->x - $this->x) ** 2 + ($target->z - $this->z) ** 2);
-		$vertical = ($target->y - $this->y) + 0.55;
-		$this->pitch = -atan2($vertical, $horizontal) / M_PI * 180; //negative is up, positive is down
+	  $targetPos = $target->getPosition();
+	  $myPos = $this->getPosition();
 
-		$xDist = $target->x - $this->x;
-		$zDist = $target->z - $this->z;
-		$this->yaw = atan2($zDist, $xDist) / M_PI * 180 - 90;
-		if($this->yaw < 0){
-			$this->yaw += 360.0;
-		}
-		$this->updateMovementInto($target);
+	  $horizontal = sqrt(($targetPos->x - $myPos->x) ** 2 + ($targetPos->z - $myPos->z) ** 2);
+	  $vertical = ($targetPos->y - $myPos->y) + 0.55;
+
+	  $this->location->pitch = -atan2($vertical, $horizontal) / M_PI * 180; //negative is up, positive is down
+	  
+	  $xDist = $targetPos->x - $myPos->x;
+	  $zDist = $targetPos->z - $myPos->z;
+	  $this->location->yaw = atan2($zDist, $xDist) / M_PI * 180 - 90;
+	  if($this->location->yaw < 0){
+	    $this->location->yaw += 360.0;
+	  }
+	  $this->updateMovementInto($target);
 	}
 
 	private function updateMovementInto(Player $player): void{
-		// (byte)((pkg.x == -1 ? 1 : 0) | (pkg.x == 1 ? 2 : 0) | (pkg.y == -1 ? 4 : 0) | (pkg.y == 1 ? 8 : 0) | (pkg.pckp ? 16 : 0) | (pkg.thrw ? 32 : 0) | (pkg.jmp ? 64 : 0))
-		$pk = new MoveActorAbsolutePacket();
-
-		$pk->entityRuntimeId = $this->id;
-		$pk->position = $this->getOffsetPosition($this);
-
-		$pk->xRot = $this->pitch;
-		$pk->yRot = $this->yaw;
-		$pk->zRot = $this->yaw;
-
-		$player->sendDataPacket($pk);
+		$player->sendDataPacket(MoveActorAbsolutePacket::create(
+		   $entity->getId(),
+		   $this->getOffsetPosition($this->getPosition()), 
+		   $this->location->pitch, 
+		   $this->location->yaw, 
+		   $this->location->yaw, 
+		   0
+		));
 	}
 
-	public function close(): void{
+	protected function onDispose(): void{
 		$this->despawnText($this->getViewers());
 
 		parent::close();
@@ -190,7 +169,6 @@ class FakeHuman extends Human {
 	public function spawnTo(Player $player): void{
 		parent::spawnTo($player);
 
-		// Resend the text packet to the player
 		$this->sendText([], true, $player);
 	}
 
@@ -201,21 +179,19 @@ class FakeHuman extends Human {
 	}
 
 	/**
-	 * @param Player[] $player
+	 * @param Player[] $players
 	 */
-	public function despawnText(array $player): void{
-		$pk = [];
+	public function despawnText(array $players): void{
+	  if($this->particleCache === null) return;
 
-		$this->particleCache->setInvisible(true);
+	  $this->particleCache->setInvisible(true);
 
-		$pk = array_merge($pk, $this->particleCache->encode());
+	  foreach($players as $player){
+	    $player->getWorld()->addParticle($this->getOffsetPosition($this->getPosition()), $this->particleCache, [$player]);
+	  }
 
-		$this->particleCache->setInvisible(false);
-
-		Server::getInstance()->batchPackets($player, $pk);
+	  $this->particleCache->setInvisible(false);
 	}
-
-	// TODO: Use entity default spawn
 
 	/**
 	 * @param string[] $messages
@@ -223,37 +199,28 @@ class FakeHuman extends Human {
 	 * @param Player|null $player
 	 */
 	public function sendText(array $messages, bool $resend = false, ?Player $player = null): void{
-		$pk = [];
+	  if($resend && $this->particleCache !== null){
+	    $particle = $this->particleCache;
+	  }else{
+	    if($this->particleCache === null){
+	      $this->particleCache = new FloatingTextParticle(implode("\n", $msg = implode("\n", $messages)));
+	      $particle = $this->particleCache;
+	      $this->messageCache = $msg;
+	    }else{
+	      $msg = implode("\n", $messages);
+	      if($this->messageCache === $msg){
+	        return;
+	      }
 
-		if($resend && $this->particleCache !== null){
-			$pk = array_merge($pk, $this->particleCache->encode());
-		}else{
-			if($this->particleCache === null){
-				$this->particleCache = $particle = new FloatingTextParticle($this->getOffsetPosition($this), $msg = implode("\n", $messages));
-				$pk = array_merge($pk, $particle->encode());
+	      $this->messageCache = $msg;
+	      $this->particleCache->setText($msg);
+	      $particle = $this->particleCache;
+	    }
+	  }
 
-				$this->messageCache = $msg;
-			}else{
-				$msg = implode("\n", $messages);
-				if($this->messageCache === $msg){
-					return;
-				}
-
-				$this->messageCache = $msg;
-
-				$this->particleCache->setText($msg);
-				$pk = array_merge($pk, $this->particleCache->encode());
-			}
-		}
-
-		if(!empty($pk)){
-			if($player !== null){
-				foreach($pk as $packet){
-					$player->batchDataPacket($packet);
-				}
-			}else{
-				Server::getInstance()->batchPackets($this->getViewers(), $pk);
-			}
-		}
+	  $targets = $player !== null ? [$player] : $this->getViewers();
+	  foreach($targets as $target){
+	    $target->getWorld()->addParticle($this->getOffsetPosition($this->getPosition()), $particle, [$target]);
+	  }
 	}
 }
