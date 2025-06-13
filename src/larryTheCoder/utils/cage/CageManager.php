@@ -33,9 +33,8 @@ use larryTheCoder\database\SkyWarsDatabase;
 use larryTheCoder\SkyWarsPE;
 use larryTheCoder\utils\permission\PluginPermission;
 use larryTheCoder\utils\PlayerData;
-use larryTheCoder\utils\Utils;
 use onebone\economyapi\EconomyAPI;
-use pocketmine\{block\BlockFactory, Player, utils\Config};
+use pocketmine\{block\VanillaBlocks, item\StringToItemParser, item\LegacyStringToItemParser, item\ItemBlock, player\Player, utils\Config};
 
 class CageManager {
 
@@ -75,7 +74,7 @@ class CageManager {
 
 			$i = 0;
 			foreach(["floor", "lower-middle", "middle", "higher-middle", "roof"] as $keys){
-				$blocks[$i++] = Utils::convertToBlock($config->getNested("cages.$value.$keys"));
+				$blocks[$i++] = self::convertToBlock($config->getNested("cages.$value.$keys"));
 			}
 
 			$cage = new Cage($cageName, $cagePrice, $default ? "" : $permission, $blocks);
@@ -90,7 +89,7 @@ class CageManager {
 			// to outsmart the code but failed.
 			$blocks = [];
 			for($j = 0; $j < 4; ++$j){
-				$blocks[$j] = BlockFactory::get(20);
+				$blocks[$j] = VanillaBlocks::GLASS();
 			}
 
 			$this->defaultCage = new Cage("Default Cage", 0, "", $blocks);
@@ -162,5 +161,15 @@ class CageManager {
 	 */
 	public function getPlayerCage(Player $p): Cage{
 		return isset($this->cagesSet[$p->getName()]) ? $this->cagesSet[$p->getName()] : $this->defaultCage;
+	}
+
+	private function convertToBlock(string $string): Block {
+	  $item = StringToItemParser::getInstance()->parse($string) ?? LegacyStringToItemParser::getInstance()->parse($string);
+
+	  if(!$item instanceof ItemBlock){
+	    throw new \InvalidArgumentException("Unable to resolve \"" . $str . "\" as a valid block for player cages");
+	  }
+
+	  return $item->getBlock();
 	}
 }
