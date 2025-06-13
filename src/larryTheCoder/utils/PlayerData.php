@@ -31,20 +31,14 @@ namespace larryTheCoder\utils;
 
 class PlayerData {
 
-	/** @var integer */
-	public $kill = 0;
-	/** @var integer */
-	public $death = 0;
-	/** @var integer */
-	public $wins;
-	/** @var integer */
-	public $lost = 0;
-	/** @var string */
-	public $player = "";
-	/** @var integer */
-	public $time = 0;
+	public int $kill = 0;
+	public int $death = 0;
+	public int $wins;
+	public int $lost = 0;
+	public string $player = "";
+	public int $time = 0;
 	/** @var string[] */
-	public $permissions;
+	public array $permissions;
 
 	public function __toString(){
 		return "PlayerData(player= " . $this->player . ",kill=" . $this->kill . ",death=" . $this->death . ",wins=" . $this->wins . ",lost=" . $this->lost . ",permissions=" . implode(":", $this->permissions) . ", time=" . $this->time . ") ";
