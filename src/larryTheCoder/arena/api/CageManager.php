@@ -31,7 +31,7 @@ declare(strict_types = 1);
 namespace larryTheCoder\arena\api;
 
 use pocketmine\math\Vector3;
-use pocketmine\Player;
+use pocketmine\player\Player;
 
 /**
  * Manages player cages/spawn pedestals.
@@ -39,9 +39,9 @@ use pocketmine\Player;
 class CageManager {
 
 	/** @var Vector3[] */
-	protected $claimedCages = [];
+	protected array $claimedCages = [];
 	/** @var Vector3[] */
-	private $cages;
+	private array $cages;
 
 	/**
 	 * CageManager constructor.
