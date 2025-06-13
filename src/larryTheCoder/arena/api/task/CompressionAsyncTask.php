@@ -29,7 +29,6 @@
 namespace larryTheCoder\arena\api\task;
 
 use pocketmine\scheduler\AsyncTask;
-use pocketmine\Server;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use SplFileInfo;
@@ -41,22 +40,46 @@ use ZipArchive;
  */
 class CompressionAsyncTask extends AsyncTask {
 
-	/** @var string */
-	private $data;
+	private string $serializedData;
 
 	/**
 	 * CompressionAsyncTask constructor.
-	 * @param array<int, string|bool> $data
+	 * @param ThreadSafeArray $data
 	 * @param callable $result
 	 */
-	public function __construct(array $data, callable $result){
-		$this->data = serialize($data);
+	public function __construct(ThreadSafeArray $data, callable $result){
+	  $fromPath = "";
+	  $toPath = "";
+	  $compress = false;
+	  foreach($data as $key => $value){
+	    switch($key){
+	      case 0:
+	        $fromPath = (string) $value;
+	        break;
+	      case 1:
+	        $toPath = (string) $value;
+	        break;
+	      case 2:
+	        $compress = (bool) $value;
+	        break;
+	    }
+	  }
 
-		$this->storeLocal($result);
+		$this->serializedData = igbinary_serialize([
+		   "source" => $fromPath,
+		   "destination" => $toPath,
+		   "compress" => $compress
+		]);
+
+		$this->storeLocal("result", $result);
 	}
 
-	public function onRun(){
-		[$fromPath, $toPath, $compress] = $data = unserialize($this->data);
+	public function onRun(): void{
+	  [
+	    "source" => $fromPath,
+	    "destination" => $toPath,
+	    "compress" => $compress
+	  ] = igbinary_unserialize($this->serializedData);
 
 		if($compress){
 			// "folder" "target.zip"
@@ -91,7 +114,7 @@ class CompressionAsyncTask extends AsyncTask {
 
 				// Add current file to archive
 				$zip->addFile($filePath, $relativePath);
-				$zip->setCompressionName($filePath, ZipArchive::CM_BZIP2);
+				$zip->setCompressionName($filePath, ZipArchive::CM_DEFLATE);
 			}
 		}
 
@@ -113,8 +136,8 @@ class CompressionAsyncTask extends AsyncTask {
 		$zip->close();
 	}
 
-	public function onCompletion(Server $server): void{
-		$call = $this->fetchLocal();
+	public function onCompletion(): void{
+		$call = $this->fetchLocal("result");
 		$call();
 	}
 }
