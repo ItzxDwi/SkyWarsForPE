@@ -32,7 +32,7 @@ namespace larryTheCoder\forms;
 
 use Closure;
 use larryTheCoder\forms\elements\Element;
-use pocketmine\{form\FormValidationException, Player, utils\Utils};
+use pocketmine\{form\FormValidationException, player\Player, utils\Utils};
 use function array_merge;
 use function gettype;
 use function is_array;
