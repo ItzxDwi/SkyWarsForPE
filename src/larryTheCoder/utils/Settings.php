@@ -36,14 +36,13 @@ class Settings {
 
 	# ============ GENERALS CONFIG ============
 
-	/** @var string */
-	public static $prefix = '§d[§eSkyWars§d] §a';
-	/** @var int */
-	public static $joinHealth = 20;
+	public static string $prefix = '§d[§eSkyWars§d] §a';
+
+	public static int $joinHealth = 20;
 	/** @var string[] */
-	public static $acceptedCommand = [];
-	/** @var int */
-	public static $defaultGamemode = 0;
+	public static array $acceptedCommand = [];
+
+	public static int $defaultGamemode = 0;
 
 	# ============ GENERALS CONFIG ============
 
