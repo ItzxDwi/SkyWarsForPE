@@ -39,17 +39,12 @@ use larryTheCoder\SkyWarsPE;
 use larryTheCoder\utils\Settings;
 use larryTheCoder\utils\Utils;
 use pocketmine\command\{Command, CommandSender};
-use pocketmine\Player;
+use pocketmine\player\Player;
 use pocketmine\Server;
 
 final class SkyWarsCommand {
 
-	/** @var SkyWarsPE */
-	private $plugin;
-
-	public function __construct(SkyWarsPE $e){
-		$this->plugin = $e;
-	}
+	public function __construct(private SkyWarsPE $plugin){}
 
 	/**
 	 * @param CommandSender $sender
@@ -92,7 +87,7 @@ final class SkyWarsCommand {
 					if($arena->getPlayerManager()->isInArena($sender)){
 						$arena->leaveArena($sender);
 					}else{
-						$sender->teleport(Server::getInstance()->getDefaultLevel()->getSafeSpawn());
+						$sender->teleport(Server::getInstance()->getWorldManager()->getDefaultWorld()->getSafeSpawn());
 					}
 
 					break;
