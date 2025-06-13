@@ -38,32 +38,16 @@ use pocketmine\entity\Human;
 use pocketmine\event\Listener;
 use pocketmine\event\player\PlayerChatEvent;
 use pocketmine\event\player\PlayerJoinEvent;
-use pocketmine\event\server\DataPacketReceiveEvent;
-use pocketmine\network\mcpe\protocol\LoginPacket;
-use pocketmine\Player;
+use pocketmine\player\Player;
 use pocketmine\Server;
 use pocketmine\utils\TextFormat;
-use pocketmine\utils\UUID;
 
 class EventListener extends BasicListener implements Listener {
 
-	/** @var bool */
-	public static $isDebug = false;
 	/** @var bool[] */
 	public static $moderators = [];
 
-	/** @var int */
-	private static $nextPlayer = 0;
-
-	/** @var SkyWarsPE */
-	private $plugin;
-
-	public function __construct(SkyWarsPE $plugin){
-		$this->plugin = $plugin;
-
-		// My project environment.
-		self::$isDebug = getenv("Project") === "E:\ACD-HyruleServer\plugins";
-	}
+	public function __construct(private SkyWarsPE $plugin){}
 
 	/**
 	 * @param PlayerJoinEvent $e
@@ -72,19 +56,6 @@ class EventListener extends BasicListener implements Listener {
 	 */
 	public function onPlayerLogin(PlayerJoinEvent $e): void{
 		SkyWarsDatabase::createPlayer($e->getPlayer());
-	}
-
-	public function loginEvent(DataPacketReceiveEvent $event): void{
-		// DEBUGGING PURPOSES
-
-		if(!self::$isDebug) return;
-
-		$packet = $event->getPacket();
-
-		if($packet instanceof LoginPacket){
-			$packet->username = "larryZ00" . self::$nextPlayer++;
-			$packet->clientUUID = UUID::fromRandom()->toString();
-		}
 	}
 
 	/**
@@ -125,7 +96,7 @@ class EventListener extends BasicListener implements Listener {
 			$event->setRecipients($filterRecipients);
 		}else{
 			foreach(self::$moderators as $playerName => $indicator){
-				$moderator = Server::getInstance()->getPlayer($playerName);
+				$moderator = Server::getInstance()->getPlayerExact($playerName);
 
 				if($indicator && $moderator !== null && $moderator->isOnline() && $playerName !== $player->getName()){
 					$moderator->sendMessage(TextFormat::GRAY . $arena->getMapName() . " > " . $event->getFormat());
