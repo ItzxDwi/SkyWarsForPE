@@ -39,7 +39,6 @@ use larryTheCoder\forms\FormQueue;
 use larryTheCoder\forms\MenuForm;
 use pocketmine\console\ConsoleCommandSender;
 use pocketmine\event\Listener;
-use pocketmine\item\ItemTypeIds;
 use pocketmine\player\Player;
 use pocketmine\Server;
 use pocketmine\utils\TextFormat;
@@ -137,7 +136,7 @@ class KitManager implements Listener {
 		$invCount = count($invSlots);
 
 		foreach($armorSlots as $key => $armorSlot){
-			if($playerArmor[$key]->getTypeId() !== ItemTypeIds::AIR){
+			if(!$playerArmor[$key]->isNull()){
 				$invCount++;
 			}
 		}
@@ -149,7 +148,7 @@ class KitManager implements Listener {
 
 		foreach($armorSlots as $key => $armorSlot){
 			if($kit->doOverrideArmor()) $playerArmorInv->setItem($key, $armorSlot);
-			elseif($playerArmorInv->getItem($key)->getTypeId() !== ItemTypeIds::AIR) $playerInv->addItem($armorSlot);
+			elseif(!$playerArmorInv->getItem($key)->isNull()) $playerInv->addItem($armorSlot);
 			else $playerArmorInv->setItem($key, $armorSlot);
 		}
 
