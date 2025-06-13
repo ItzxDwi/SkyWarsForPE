@@ -46,7 +46,7 @@ use pocketmine\event\entity\EntityDamageEvent;
 use pocketmine\event\inventory\InventoryCloseEvent;
 use pocketmine\event\inventory\InventoryOpenEvent;
 use pocketmine\event\player\PlayerChatEvent;
-use pocketmine\event\player\PlayerCommandPreprocessEvent;
+use pocketmine\event\server\CommandEvent;
 use pocketmine\event\player\PlayerExhaustEvent;
 use pocketmine\event\player\PlayerQuitEvent;
 use pocketmine\block\inventory\ChestInventory;
@@ -266,13 +266,14 @@ class EventListener extends ArenaListener {
 		$this->arena->setSpectator($player);
 	}
 
-	public function onPlayerExecuteCommand(PlayerCommandPreprocessEvent $event): void{
-		$player = $event->getPlayer();
+	public function onPlayerExecuteCommand(CommandEvent $event): void{
+		$sender = $event->getSender();
+		if(!$sender instanceof Player) return;
 
-		if(!in_array(strtolower($event->getMessage()), Settings::$acceptedCommand, true)
+		if(!in_array(strtolower($event->getCommand()), Settings::$acceptedCommand, true)
 			&& $this->arena->getStatus() === ArenaState::STATE_ARENA_RUNNING
-			&& !$player->hasPermission("sw.moderation")){
-			$player->sendMessage(TranslationContainer::getTranslation($player, 'arena-command-forbidden'));
+			&& !$sender->hasPermission("sw.moderation")){
+			$sender->sendMessage(TranslationContainer::getTranslation($sender, 'arena-command-forbidden'));
 		}
 	}
 }
