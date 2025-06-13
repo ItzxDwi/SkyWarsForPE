@@ -38,12 +38,9 @@ use pocketmine\utils\Config;
  */
 class ConfigManager {
 
-	/** @var Config */
-	public $config;
-	/** @var string */
-	public $fileName;
-	/** @var string */
-	public $arenaName;
+	public Config $config;
+	public string $fileName;
+	public string $arenaName;
 
 	public function __construct(string $fileName, Config $arenaConfig){
 		$this->fileName = $fileName;
@@ -55,11 +52,11 @@ class ConfigManager {
 		return $this->config;
 	}
 
-	public function setJoinSign(int $x, int $y, int $z, string $level): ConfigManager{ # OK
+	public function setJoinSign(int $x, int $y, int $z, string $world): ConfigManager{ # OK
 		$this->config->setNested('signs.join-sign-x', $x);
 		$this->config->setNested('signs.join-sign-y', $y);
 		$this->config->setNested('signs.join-sign-z', $z);
-		$this->config->setNested('signs.join-sign-world', $level);
+		$this->config->setNested('signs.join-sign-world', $world);
 
 		return $this;
 	}
