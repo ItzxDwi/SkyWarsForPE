@@ -49,7 +49,7 @@ use pocketmine\entity\Entity;
 use pocketmine\math\Vector3;
 use pocketmine\plugin\{PluginBase};
 use pocketmine\Server;
-use pocketmine\utils\{Config, MainLogger, TextFormat};
+use pocketmine\utils\{Config, TextFormat};
 
 /**
  * The main class for SkyWarsForPE infrastructure, originally written for Alair069.
@@ -63,24 +63,21 @@ class SkyWarsPE extends PluginBase {
 	private const LOCALE_VERSION = 11;
 	private const CAGES_VERSION = 2;
 
-	/** @var SkyWarsPE|null */
-	private static $instance;
+	private static ?SkyWarsPE $instance = null;
 
-	/** @var SkyWarsCommand */
-	private $command;
-	/** @var bool */
-	private $crashed = true;
+	private SkyWarsCommand $command;
 
-	/** @var EconomyAPI|null */
-	private $economy;
-	/** @var ArenaManager */
-	private $arenaManager;
-	/** @var FormManager */
-	private $panel;
-	/** @var PedestalManager|null */
-	private $pedestalManager = null;
-	/** @var KitManager|null */
-	private $kitManager = null;
+	private bool $crashed = true;
+
+	private ?EconomyAPI $economy = null;
+
+	private ArenaManager $arenaManager;
+
+	private FormManager $panel;
+
+	private ?PedestalManager $pedestalManager = null;
+
+	private ?KitManager $kitManager = null;
 
 	public function onLoad(): void{
 		self::$instance = $this;
@@ -209,11 +206,11 @@ class SkyWarsPE extends PluginBase {
 
 			return;
 		}
-		$levelName = $npc1E[3];
+		$worldName = $npc1E[3];
 
-		Utils::loadFirst($levelName);
+		Utils::loadFirst($worldName);
 
-		$level = $this->getServer()->getLevelByName($levelName);
+		$world = $this->getServer()->getWorldManager()->getWorldByName($worldName);
 
 		$vectors[] = new Vector3((float)$npc1E[0], (float)$npc1E[1], (float)$npc1E[2]);
 		$vectors[] = new Vector3((float)$npc2E[0], (float)$npc2E[1], (float)$npc2E[2]);
@@ -221,10 +218,10 @@ class SkyWarsPE extends PluginBase {
 
 		// Force to load the chunks (An error can occur if the world is freshly loaded) aka dummy server owner.
 		foreach($vectors as $vector){
-			$level->loadChunk($vector->getFloorX() >> 4, $vector->getFloorZ() >> 4);
+			$world->loadChunk($vector->getFloorX() >> 4, $vector->getFloorZ() >> 4);
 		}
 
-		$this->pedestalManager = new PedestalManager($vectors, $level);
+		$this->pedestalManager = new PedestalManager($vectors, $world);
 	}
 
 	private function checkPlugins(): void{
@@ -278,7 +275,7 @@ class SkyWarsPE extends PluginBase {
 
 			$this->getServer()->getLogger()->info(Settings::$prefix . TextFormat::RED . 'SkyWarsForPE has disabled');
 		}catch(\Throwable $error){
-			MainLogger::getLogger()->logException($error);
+		  $this->getServer()->getLogger()->logException($error)
 
 			$this->getServer()->getLogger()->info(Settings::$prefix . TextFormat::RED . 'Failed to disable plugin accordingly.');
 		}
