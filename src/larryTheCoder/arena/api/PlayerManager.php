@@ -34,13 +34,14 @@ use larryTheCoder\arena\api\impl\ArenaState;
 use larryTheCoder\arena\api\translation\TranslationContainer;
 use larryTheCoder\utils\Utils;
 use pocketmine\block\utils\ColorBlockMetaHelper;
-use pocketmine\level\Level;
-use pocketmine\Player;
+use pocketmine\world\World;
+use pocketmine\player\Player;
 use pocketmine\utils\TextFormat;
 use RuntimeException;
 
 class PlayerManager {
 
+  //TODO:
 	public const BLOCK_META_TO_TF = [
 		0  => TextFormat::WHITE,
 		1  => TextFormat::GOLD,
@@ -64,29 +65,27 @@ class PlayerManager {
 	//
 
 	/** @var bool */
-	public $teamMode = false;
+	public bool $teamMode = false;
 	/** @var int */
-	public $maximumMembers = 0;
+	public int $maximumMembers = 0;
 	/** @var int */
-	public $maximumTeams = 0;
+	public int $maximumTeams = 0;
 	/** @var int[] */
-	public $allowedTeams = [];
+	public array $allowedTeams = [];
 
 	/** @var Player[] */
-	private $players = [];
+	private array $players = [];
 	/** @var Player[] */
-	private $spectators = [];
-	/** @var Level|null */
-	private $arenaLevel;
+	private array $spectators = [];
+	private ?World $arenaWorld;
 	/** @var int[] */
-	private $teams = []; // "Player" => "Team color"
-	/** @var Arena */
-	private $arena;
+	private array $teams = []; // "Player" => "Team color"
+	private Arena $arena;
 
 	/** @var string[] */
-	private $ranking = [];
+	private array $ranking = [];
 	/** @var int[] */
-	public $kills = [];
+	public array $kills = [];
 
 	public function __construct(Arena $arena){
 		$this->arena = $arena;
@@ -99,11 +98,6 @@ class PlayerManager {
 		# Set the player health and food
 		$pl->setMaxHealth(20);
 		$pl->setMaxHealth($pl->getMaxHealth());
-		# just to be really sure
-		if($pl->getAttributeMap() != null){
-			$pl->setHealth(20);
-			$pl->setFood(20);
-		}
 
 		$this->players[strtolower($pl->getName())] = $pl;
 		$this->kills[strtolower($pl->getName())] = 0;
@@ -348,7 +342,7 @@ class PlayerManager {
 			return ArenaState::PLAYER_ALIVE;
 		}elseif(isset($this->spectators[strtolower($sender->getName())])){
 			return ArenaState::PLAYER_SPECTATE;
-		}elseif($this->arenaLevel !== null && strtolower($sender->getLevel()->getName()) === strtolower($this->arenaLevel->getName())){
+		}elseif($this->arenaWorld !== null && strtolower($sender->getWorld()->getName()) === strtolower($this->arenaWorld->getName())){
 			return ArenaState::PLAYER_SPECIAL;
 		}else{
 			return ArenaState::PLAYER_UNSET;
@@ -448,6 +442,8 @@ class PlayerManager {
 
 		return $winners;
 	}
+
+  //TODO:
 
 	public function getTeamColorRaw(Player $player): int{
 		$color = $this->teams[strtolower($player->getName())] ?? null;
