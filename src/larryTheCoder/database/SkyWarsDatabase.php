@@ -34,9 +34,9 @@ use larryTheCoder\arena\api\utils\SingletonTrait;
 use larryTheCoder\SkyWarsPE;
 use larryTheCoder\utils\PlayerData;
 use larryTheCoder\utils\Utils;
-use pocketmine\level\Position;
+use pocketmine\world\Position;
 use pocketmine\math\Vector3;
-use pocketmine\Player;
+use pocketmine\player\Player;
 use pocketmine\Server;
 use pocketmine\utils\TextFormat;
 use poggit\libasynql\DataConnector;
@@ -50,13 +50,11 @@ class SkyWarsDatabase {
 	/** @var \Closure */
 	private static $emptyStatement;
 
-	/** @var DataConnector */
-	private $database;
+	private DataConnector $database;
 
-	/** @var Vector3|null */
-	private $vector3 = null;
-	/** @var string|null */
-	private $levelName = null;
+	private ?Vector3 $vector3 = null;
+
+	private ?string $worldName = null;
 
 	public function __construct(){
 		self::$emptyStatement = static function(): void{
@@ -215,9 +213,9 @@ class SkyWarsDatabase {
 			"lobbyX"    => $position->getFloorX(),
 			"lobbyY"    => $position->getFloorY(),
 			"lobbyZ"    => $position->getFloorZ(),
-			"worldName" => $position->getLevel()->getFolderName(),
+			"worldName" => $position->getWorld()->getFolderName(),
 		], function() use ($position): void{
-			self::getInstance()->levelName = $position->getLevel()->getFolderName();
+			self::getInstance()->worldName = $position->getWorld()->getFolderName();
 			self::getInstance()->vector3 = $position->asVector3();
 		}, static function(SqlError $result): void{
 			SkyWarsPE::getInstance()->getLogger()->emergency($result->getQuery() . ' - ' . $result->getErrorMessage());
@@ -226,30 +224,30 @@ class SkyWarsDatabase {
 
 	public static function getLobby(): Position{
 		$self = self::getInstance();
-		if($self->vector3 === null || $self->levelName === null){
+		if($self->vector3 === null || $self->worldName === null){
 			throw new RuntimeException("Spawn location are invalid, this shouldn't happen in the first place!");
 		}
-		Utils::loadFirst($self->levelName);
+		Utils::loadFirst($self->worldName);
 
-		return Position::fromObject($self->vector3, Server::getInstance()->getLevelByName($self->levelName));
+		return Position::fromObject($self->vector3, Server::getInstance()->getWorldManager()->getWorldByName($self->worldName));
 	}
 
 	public static function loadLobby(): void{
 		self::getInstance()->database->executeSelect("data.selectLobby", [
 		], function(array $rows): void{
 			if(empty($rows)){
-				$level = Server::getInstance()->getDefaultLevel();
-				self::getInstance()->vector3 = $level->getSpawnLocation()->asVector3();
-				self::getInstance()->levelName = $level->getFolderName();
+				$world = Server::getInstance()->getWorldManager()->getDefaultWorld();
+				self::getInstance()->vector3 = $world->getSpawnLocation()->asVector3();
+				self::getInstance()->worldName = $world->getFolderName();
 
 				Utils::send(TextFormat::RED . "Default lobby location could not be located! Please set your lobby with /sw setlobby");
 			}else{
 				Utils::loadFirst($rows[0]['worldName']);
 
-				$level = Server::getInstance()->getLevelByName($rows[0]['worldName']);
+				$world = Server::getInstance()->getWorldManager()->getWorldByName($rows[0]['worldName']);
 
 				self::getInstance()->vector3 = new Vector3(intval($rows[0]["lobbyX"]) + .5, intval($rows[0]["lobbyY"]) + .5, intval($rows[0]["lobbyZ"]) + .5);
-				self::getInstance()->levelName = $level->getFolderName();
+				self::getInstance()->worldName = $world->getFolderName();
 			}
 		}, static function(SqlError $result): void{
 			SkyWarsPE::getInstance()->getLogger()->emergency($result->getQuery() . ' - ' . $result->getErrorMessage());
