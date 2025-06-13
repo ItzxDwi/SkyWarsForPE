@@ -46,40 +46,38 @@ use larryTheCoder\utils\ConfigManager;
 use larryTheCoder\utils\LootGenerator;
 use larryTheCoder\utils\Settings;
 use larryTheCoder\utils\Utils;
-use pocketmine\block\BlockFactory;
-use pocketmine\level\Level;
-use pocketmine\level\Position;
-use pocketmine\Player;
+use pocketmine\block\VanillaBlocks;
+use pocketmine\world\World;
+use pocketmine\world\Position;
+use pocketmine\player\GameMode;
+use pocketmine\player\Player;
 use pocketmine\plugin\Plugin;
 use pocketmine\Server;
-use pocketmine\tile\Chest;
+use pocketmine\block\tile\Chest;
 
 class ArenaImpl extends ArenaData {
 
-	/** @var LootGenerator|null */
-	public static $lootTables = null;
+	public static ?LootGenerator $lootTables = null;
 
 	// Allow invincible period on this arena.
 	const ARENA_INVINCIBLE_PERIOD = 0x12;
 
-	/** @var EventListener */
-	private $eventListener;
+	private EventListener $eventListener;
 	/** @var array */
-	private $arenaData;
-	/** @var SignManager */
-	private $signManager;
-	/** @var ConfigManager */
-	private $configManager;
+	private array $arenaData;
+
+	private SignManager $signManager;
+
+	private ConfigManager $configManager;
 
 	/** @var Position[][] */
-	private $toRemove = [];
+	private array $toRemove = [];
 	/** @var string[] */
-	private $originalNametag = [];
+	private array $originalNametag = [];
 	/** @var true[] */
-	private $openedChests = [];
+	private array $openedChests = [];
 
-	/** @var int */
-	public $startedTime = -1;
+	public int $startedTime = -1;
 
 	/**
 	 * ArenaImpl constructor.
@@ -142,7 +140,7 @@ class ArenaImpl extends ArenaData {
 
 		foreach($pm->getAlivePlayers() as $player){
 			// Set the player gamemode first
-			$player->setGamemode(Player::SURVIVAL);
+			$player->setGamemode(GameMode::SURVIVAL());
 			$player->getInventory()->clearAll();
 			$player->getArmorInventory()->clearAll();
 
@@ -164,10 +162,11 @@ class ArenaImpl extends ArenaData {
 		// Cage factory reset.
 		// It is quite impossible for this to return an unloaded object since the
 		// arena world is already loaded and the match has started.
-		if($this->getLevel() !== null && !$this->getLevel()->isClosed()){
+		if($this->getWorld() !== null && !$this->getWorld()->isClosed()){
+		  $air = VanillaBlocks::AIR();
 			foreach($this->toRemove as $data){
 				foreach($data as $pos){
-					$this->getLevel()->setBlock($pos, BlockFactory::get(0));
+					$this->getWorld()->setBlock($pos, $air);
 				}
 			}
 		}
@@ -188,13 +187,13 @@ class ArenaImpl extends ArenaData {
 	public function joinToArena(Player $player): void{
 		parent::joinToArena($player);
 
-		$player->setGamemode(Player::ADVENTURE);
+		$player->setGamemode(GameMode::ADVENTURE());
 
 		// Build up the cage object.
 		$cage = CageHandler::getInstance()->getPlayerCage($player);
 		$spawnLoc = $this->getCageManager()->getCage($player);
 
-		$this->toRemove[$player->getName()] = $cage->build(Position::fromObject($spawnLoc, $this->getLevel()));
+		$this->toRemove[$player->getName()] = $cage->build(Position::fromObject($spawnLoc, $this->getWorld()));
 
 		$pm = $this->getPlayerManager();
 
@@ -229,7 +228,7 @@ class ArenaImpl extends ArenaData {
 		$player->setHealth(20);
 		$player->setFood(20);
 
-		$player->teleport(Position::fromObject($this->arenaSpecPos, $this->getLevel()));
+		$player->teleport(Position::fromObject($this->arenaSpecPos, $this->getWorld()));
 	}
 
 	public function unsetPlayer(Player $player, bool $isSpectator = false): void{
@@ -246,7 +245,8 @@ class ArenaImpl extends ArenaData {
 		}
 
 		if(!$player->isClosed()){
-			$player->setGamemode(Settings::$defaultGamemode);
+		  $gameMode = GameMode::fromString(Settings::$defaultGamemode) ?? GameMode::SURVIVAL();
+			$player->setGamemode($gameMode);
 
 			$player->getInventory()->clearAll();
 			$player->getArmorInventory()->clearAll();
@@ -273,9 +273,10 @@ class ArenaImpl extends ArenaData {
 		}
 
 		if(isset($this->toRemove[$player->getName()])){
-			if($this->getLevel() !== null && !$this->getLevel()->isClosed()){
+			if($this->getWorld() !== null && !$this->getWorld()->isClosed()){
+			  $air = VanillaBlocks::AIR();
 				foreach($this->toRemove[$player->getName()] as $pos){
-					$this->getLevel()->setBlock($pos, BlockFactory::get(0));
+					$this->getWorld()->setBlock($pos, $air);
 				}
 			}
 
@@ -309,7 +310,7 @@ class ArenaImpl extends ArenaData {
 	}
 
 	public function isChestRefilled(Chest $chest): bool{
-		return isset($this->openedChests[Level::blockHash($chest->getFloorX(), $chest->getFloorY(), $chest->getFloorZ())]);
+		return isset($this->openedChests[World::blockHash($chest->getFloorX(), $chest->getFloorY(), $chest->getFloorZ())]);
 	}
 
 	public function refillChest(Chest $chest): void{
@@ -320,7 +321,7 @@ class ArenaImpl extends ArenaData {
 		$chest->getInventory()->clearAll();
 		$chest->getInventory()->setContents(LootGenerator::getLoot());
 
-		$this->openedChests[Level::blockHash($chest->getFloorX(), $chest->getFloorY(), $chest->getFloorZ())] = true;
+		$this->openedChests[World::blockHash($chest->getFloorX(), $chest->getFloorY(), $chest->getFloorZ())] = true;
 	}
 
 	public function refillChests(): void{
@@ -339,7 +340,7 @@ class ArenaImpl extends ArenaData {
 		return $this->arenaFileName;
 	}
 
-	public function getLevelName(): string{
+	public function getWorldName(): string{
 		return $this->arenaWorld;
 	}
 
