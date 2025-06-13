@@ -34,18 +34,17 @@ use larryTheCoder\arena\ArenaImpl;
 use larryTheCoder\utils\ConfigManager;
 use larryTheCoder\utils\Utils;
 use larryTheCoder\worker\LevelAsyncPool;
-use pocketmine\Player;
+use pocketmine\player\Player;
 use pocketmine\utils\Config;
 
 final class ArenaManager {
 
-	/** @var SkyWarsPE */
-	private $plugin;
+	private SkyWarsPE $plugin;
 
 	/** @var ArenaImpl[] */
-	private $arenas = [];
+	private array $arenas = [];
 	/** @var ConfigManager[] */
-	private $config;
+	private array $config = [];
 
 	public function __construct(){
 		$this->plugin = SkyWarsPE::getInstance();
@@ -126,7 +125,7 @@ final class ArenaManager {
 	 * @param ArenaImpl $arena
 	 */
 	public function deleteArena(ArenaImpl $arena): void{
-		$task = new AsyncDirectoryDelete([$arena->getLevel()], function() use ($arena): void{
+		$task = new AsyncDirectoryDelete([$arena->getWorld()], function() use ($arena): void{
 			unlink($arena->getConfigManager()->getConfig()->getPath());
 
 			$arena->shutdown();
@@ -170,7 +169,7 @@ final class ArenaManager {
 	 */
 	public function getPlayerArena(Player $player): ?ArenaImpl{
 		$result = array_values(array_filter($this->arenas, function($arena) use ($player): bool{
-			return $arena->getPlayerManager()->isInArena($player) || $arena->getLevelName() === $player->getLevel()->getFolderName();
+			return $arena->getPlayerManager()->isInArena($player) || $arena->getWorldName() === $player->getWorld()->getFolderName();
 		}));
 
 		return $result[0] ?? null;
