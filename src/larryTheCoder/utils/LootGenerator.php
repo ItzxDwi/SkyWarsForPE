@@ -26,207 +26,184 @@
  * USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace larryTheCoder\utils;
 
 use InvalidArgumentException;
 use larryTheCoder\SkyWarsPE;
-use pocketmine\item\enchantment\Enchantment;
+use pocketmine\item\enchantment\VanillaEnchantments;
 use pocketmine\item\enchantment\EnchantmentInstance;
+use pocketmine\item\Durable;
 use pocketmine\item\Item;
-use pocketmine\item\Tool;
+use pocketmine\item\StringToItemParser;
+use pocketmine\item\LegacyStringToItemParser;
+use pocketmine\item\ItemTypeIds;
 use pocketmine\plugin\PluginException;
 use RuntimeException;
 
 class LootGenerator {
 
-	/** @var null|LootGenerator */
-	public static $generator = null;
+    /** @var null|LootGenerator */
+    public static $generator = null;
 
-	/** @var mixed[] */
-	private $lootFile;
+    /** @var mixed[] */
+    private $lootFile;
 
-	public static function init(): void{
-		$contents = file_get_contents(SkyWarsPE::getInstance()->getDataFolder() . "looting-tables.json");
+    public static function init(): void {
+        $contents = file_get_contents(SkyWarsPE::getInstance()->getDataFolder() . "looting-tables.json");
 
-		self::$generator = new LootGenerator(json_decode($contents, true));
-	}
+        self::$generator = new LootGenerator(json_decode($contents, true));
+    }
 
-	/**
-	 * Attempt to generate item loot tables from a given data. This function can use either internal
-	 * looting tables or external looting tables (Special thanks to @XenialDan).
-	 *
-	 * @param bool $useNatural
-	 * @return Item[]
-	 */
-	public static function getLoot(bool $useNatural = true): array{
-		$selectedRows = [];
-		if(!$useNatural){
-			$contents = self::$generator->getRandomLoot();
-		}else{
-			$contents = [];
-			$raw = Utils::getChestContents();
-			foreach(array_shift($raw) as $key => $val){
-				$item = Item::get($val[0], 0, $val[1]);
-				if($item->getId() == Item::IRON_SWORD ||
-					$item->getId() == Item::DIAMOND_SWORD){
-					$enchantment = Enchantment::getEnchantment(Enchantment::SHARPNESS);
-					$item->addEnchantment(new EnchantmentInstance($enchantment, mt_rand(1, 2)));
-				}elseif($item->getId() == Item::LEATHER_TUNIC ||
-					$item->getId() == Item::CHAIN_CHESTPLATE ||
-					$item->getId() == Item::IRON_CHESTPLATE ||
-					$item->getId() == Item::GOLD_CHESTPLATE ||
-					$item->getId() == Item::DIAMOND_CHESTPLATE ||
-					$item->getId() == Item::DIAMOND_LEGGINGS ||
-					$item->getId() == Item::DIAMOND_HELMET){
-					$enchantment = Enchantment::getEnchantment(Enchantment::PROTECTION);
-					$item->addEnchantment(new EnchantmentInstance($enchantment, mt_rand(1, 2)));
-				}elseif($item->getId() == Item::BOW){
-					$enchantment = Enchantment::getEnchantment(Enchantment::POWER);
-					$item->addEnchantment(new EnchantmentInstance($enchantment, mt_rand(1, 2)));
-				}
+    /**
+     * Attempt to generate item loot tables from a given data. This function can use either internal
+     * looting tables or external looting tables (Special thanks to @XenialDan).
+     *
+     * @param bool $useNatural
+     * @return Item[]
+     */
+    public static function getLoot(bool $useNatural = true): array {
+        $selectedRows = [];
+        if(!$useNatural){
+            $contents = self::$generator->getRandomLoot();
+        }else{
+            $contents = [];
+            $raw = Utils::getChestContents();
+            foreach(array_shift($raw) as $key => $val){
+                $item = StringToItemParser::getInstance()->parse($val[0]) ?? LegacyStringToItemParser::getInstance()->parse($val[0]);
+                $item->setCount($val[1]);
+                
+                if($item->getTypeId() === ItemTypeIds::IRON_SWORD ||
+                    $item->getTypeId() === ItemTypeIds::DIAMOND_SWORD){
+                    $item->addEnchantment(new EnchantmentInstance(VanillaEnchantments::SHARPNESS(), mt_rand(1, 2)));
+                }elseif($item->getTypeId() === ItemTypeIds::LEATHER_CHESTPLATE ||
+                    $item->getTypeId() === ItemTypeIds::CHAINMAIL_CHESTPLATE ||
+                    $item->getTypeId() === ItemTypeIds::IRON_CHESTPLATE ||
+                    $item->getTypeId() === ItemTypeIds::GOLDEN_CHESTPLATE ||
+                    $item->getTypeId() === ItemTypeIds::DIAMOND_CHESTPLATE ||
+                    $item->getTypeId() === ItemTypeIds::DIAMOND_LEGGINGS ||
+                    $item->getTypeId() === ItemTypeIds::DIAMOND_HELMET){
+                    $item->addEnchantment(new EnchantmentInstance(VanillaEnchantments::PROTECTION(), mt_rand(1, 2)));
+                }elseif($item->getTypeId() === ItemTypeIds::BOW){
+                    $item->addEnchantment(new EnchantmentInstance(VanillaEnchantments::POWER(), mt_rand(1, 2)));
+                }
 
-				$contents[] = $item;
-			}
-		}
+                $contents[] = $item;
+            }
+        }
 
-		foreach($contents as $item){
-			// Keep on searching for available rows.
-			$selectedRow = mt_rand(0, 27);
-			while(isset($selectedRows[$selectedRow])){
-				$selectedRow = mt_rand(0, 27);
-			}
+        foreach($contents as $item){
+            // Keep on searching for available rows.
+            $selectedRow = mt_rand(0, 27);
+            while(isset($selectedRows[$selectedRow])){
+                $selectedRow = mt_rand(0, 27);
+            }
 
-			$selectedRows[$selectedRow] = $item;
-		}
+            $selectedRows[$selectedRow] = $item;
+        }
 
-		return $selectedRows;
-	}
+        return $selectedRows;
+    }
 
-	/**
-	 * LootGenerator constructor.
-	 *
-	 * @param mixed[] $lootTable
-	 * @throws InvalidArgumentException
-	 */
-	private function __construct(array $lootTable = []){
-		$this->lootFile = $lootTable;
-	}
+    /**
+     * LootGenerator constructor.
+     *
+     * @param mixed[] $lootTable
+     * @throws InvalidArgumentException
+     */
+    private function __construct(array $lootTable = []){
+        $this->lootFile = $lootTable;
+    }
 
-	/**
-	 * @return Item[]
-	 * @throws InvalidArgumentException
-	 * @throws PluginException
-	 * @throws RuntimeException
-	 */
-	private function getRandomLoot(): array{
-		$items = [];
-		if(!isset($this->lootFile["pools"])){
-			return $items;
-		}
+    /**
+     * @return Item[]
+     * @throws InvalidArgumentException
+     * @throws PluginException
+     * @throws RuntimeException
+     */
+    private function getRandomLoot(): array {
+        $items = [];
+        if(!isset($this->lootFile["pools"])){
+            return $items;
+        }
 
-		foreach($this->lootFile["pools"] as $rolls){
-			// TODO sub-pools, see armor chain etc
-			// TODO roll conditions.. :(
-			// TODO i saw "tiers" and have no idea what these do
-			$array = [];
-			if(is_array($rolls["rolls"])){
-				$maxRolls = rand($rolls["rolls"]["min"], $rolls["rolls"]["max"]);
-			}else{
-				$maxRolls = (int)$rolls["rolls"];
-			}
+        foreach($this->lootFile["pools"] as $rolls){
+            $array = [];
+            if(is_array($rolls["rolls"])){
+                $maxRolls = rand($rolls["rolls"]["min"], $rolls["rolls"]["max"]);
+            }else{
+                $maxRolls = (int)$rolls["rolls"];
+            }
 
-			while($maxRolls > 0){
-				$maxRolls--;
-				foreach($rolls["entries"] as $index => $entries){
-					$array[] = $entries["weight"] ?? 1;
-				}
-			}
+            while($maxRolls > 0){
+                $maxRolls--;
+                foreach($rolls["entries"] as $index => $entries){
+                    $array[] = $entries["weight"] ?? 1;
+                }
+            }
 
-			if(count($array) > 1){
-				$val = $rolls["entries"][self::getRandomWeightedElement($array)] ?? [];
-			}else{
-				$val = $rolls["entries"][0] ?? [];
-			}
+            if(count($array) > 1){
+                $val = $rolls["entries"][self::getRandomWeightedElement($array)] ?? [];
+            }else{
+                $val = $rolls["entries"][0] ?? [];
+            }
 
-			if(($val["type"] ?? "") == "item"){
-				print $val["name"] . PHP_EOL;
+            if(($val["type"] ?? "") === "item"){
+                print $val["name"] . PHP_EOL;
 
-				if($val["name"] === "minecraft:fish" || $val["name"] === "fish") $val["name"] = "raw_fish";
-				if($val["name"] === "minecraft:lava_bucket") $val["name"] = "11:11";
-				if($val["name"] === "minecraft:water_bucket") $val["name"] = "11:9";
+                $item = StringToItemParser::getInstance()->parse($val["name"]) ?? LegacyStringToItemParser::getInstance()->parse($val["name"]);
+                if($item === null){
+                    continue;
+                }
 
-				$item = Item::fromString($val["name"]);
-				if(isset($val["functions"])){
-					foreach($val["functions"] as $function){
-						switch($functionName = str_replace("minecraft:", "", $function["function"])){
-							case "set_damage":
-								if($item instanceof Tool){
-									$item->setDamage(mt_rand($function["damage"]["min"] * $item->getMaxDurability(), $function["damage"]["max"] * $item->getMaxDurability()));
-								}else{
-									$item->setDamage(mt_rand($function["damage"]["min"], $function["damage"]["max"]));
-								}
+                if(isset($val["functions"])){
+                    foreach($val["functions"] as $function){
+                        switch($functionName = str_replace("minecraft:", "", $function["function"])){
+                            case "set_damage":
+                                if($item instanceof Durable){
+                                    $damage = mt_rand(
+                                        (int)($function["damage"]["min"] * $item->getMaxDurability()), 
+                                        (int)($function["damage"]["max"] * $item->getMaxDurability())
+                                    );
+                                    $item->setDamage($damage);
+                                }
+                                break;
+                            case "set_count":
+                                $item->setCount(mt_rand($function["count"]["min"], $function["count"]["max"]));
+                                break;
+                            case "looting_enchant":
+                                $item->setCount($item->getCount() + mt_rand($function["count"]["min"], $function["count"]["max"]));
+                                break;
+                            default:
+                                assert("Unknown looting table function $functionName, skipping");
+                        }
+                    }
+                }
+                $items[] = $item;
+            }
+        }
 
-								break;
-							case "set_data":
-								// Fish fix, blame mojang
-								switch($item->getId()){
-									case Item::RAW_FISH:
-										switch($function["data"]){
-											case 1:
-												$item = Item::get(Item::RAW_SALMON, $item->getDamage(), $item->getCount(), $item->getNamedTag());
-												break;
-											case 2:
-												$item = Item::get(Item::CLOWNFISH, $item->getDamage(), $item->getCount(), $item->getNamedTag());
-												break;
-											case 3:
-												$item = Item::get(Item::PUFFERFISH, $item->getDamage(), $item->getCount(), $item->getNamedTag());
-												break;
-											default:
-												break;
-										}
+        return $items;
+    }
 
-										break;
-									default:
-										$item->setDamage($function["data"]);
-								}
-								break;
-							case "set_count":
-								$item->setCount(mt_rand($function["count"]["min"], $function["count"]["max"]));
-								break;
-							case "looting_enchant":
-								$item->setCount($item->getCount() + mt_rand($function["count"]["min"], $function["count"]["max"]));
-								break;
-							default:
-								assert("Unknown looting table function $functionName, skipping");
-						}
-					}
-				}
-				$items[] = $item;
-			}
-		}
+    /**
+     * @param int[] $weightedValues
+     * @return int
+     */
+    public static function getRandomWeightedElement(array $weightedValues): int {
+        if(empty($weightedValues)){
+            throw new PluginException("The weighted values are empty");
+        }
+        $rand = mt_rand(1, (int)array_sum($weightedValues));
 
-		return $items;
-	}
+        foreach($weightedValues as $key => $value){
+            $rand -= $value;
+            if($rand <= 0){
+                return $key;
+            }
+        }
 
-	/**
-	 * @param int[] $weightedValues
-	 * @return int
-	 */
-	public static function getRandomWeightedElement(array $weightedValues): int{
-		if(empty($weightedValues)){
-			throw new PluginException("The weighted values are empty");
-		}
-		$rand = mt_rand(1, (int)array_sum($weightedValues));
-
-		foreach($weightedValues as $key => $value){
-			$rand -= $value;
-			if($rand <= 0){
-				return $key;
-			}
-		}
-
-		return -1;
-	}
+        return -1;
+    }
 }
