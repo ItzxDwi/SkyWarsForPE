@@ -34,14 +34,10 @@ use pocketmine\event\entity\EntityDamageEvent;
 
 class CombatEntry {
 
-	/** @var string */
-	public $playerName;
-	/** @var string|null */
-	public $attackFrom;
-	/** @var int */
-	public $lastAttack;
-	/** @var int */
-	public $attackId = EntityDamageEvent::CAUSE_MAGIC;
+	public string $playerName;
+	public ?string $attackFrom;
+	public int $lastAttack;
+	public int $attackId = EntityDamageEvent::CAUSE_MAGIC;
 
 	/**
 	 * Creates an entry of the last player being damaged, this entry will be used to determine the right player damager
