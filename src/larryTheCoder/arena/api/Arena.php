@@ -40,14 +40,12 @@ use larryTheCoder\arena\api\task\CompressionAsyncTask;
 use larryTheCoder\arena\api\utils\QueueManager;
 use larryTheCoder\database\SkyWarsDatabase;
 use larryTheCoder\worker\LevelAsyncPool;
+use pocketmine\block\utils\DyeColor;
+use pocketmine\block\VanillaBlocks;
 use pocketmine\item\Item;
-use pocketmine\item\ItemFactory;
-use pocketmine\item\ItemIds;
-use pocketmine\level\Level;
-use pocketmine\level\Position;
-use pocketmine\network\mcpe\protocol\AdventureSettingsPacket;
-use pocketmine\network\mcpe\protocol\types\PlayerPermissions;
-use pocketmine\Player;
+use pocketmine\item\VanillaItems;
+use pocketmine\world\Position;
+use pocketmine\player\Player;
 use pocketmine\plugin\Plugin;
 use pocketmine\Server;
 
@@ -73,39 +71,24 @@ abstract class Arena implements ShutdownSequence {
 	public const ARENA_DISABLED = 0x4;
 	public const ARENA_CRASHED = 0x5;
 
-	/** @var CageManager */
-	protected $cageManager;
-	/** @var Scoreboard|null */
-	protected $scoreboard = null;
-	/** @var QueueManager|null */
-	protected $queueManager = null;
-	/** @var string|null */
-	protected $lobbyName = null;
+	protected CageManager $cageManager;
+	protected ?Scoreboard $scoreboard = null;
+	protected ?QueueManager $queueManager = null;
+	protected ?string $lobbyName = null;
 
-	/** @var int */
-	private $arenaStatus = ArenaState::STATE_WAITING;
-	/** @var PlayerManager */
-	private $playerData;
-	/** @var Level|null */
-	private $lobbyLevel = null;
-	/** @var Level|null */
-	private $level = null;
-	/** @var Plugin */
-	private $plugin;
-	/** @var int */
-	private $deleteTimeout = 0;
-	/** @var int */
-	private $gameFlags = 0x0;
+	private int $arenaStatus = ArenaState::STATE_WAITING;
+	private PlayerManager $playerData;
+	private ?World $lobbyWorld = null;
+	private ?World $world = null;
+	private Plugin $plugin;
+	private int $deleteTimeout = 0;
+	private int $gameFlags = 0x0;
 
 	/** @var ShutdownSequence[] */
-	protected $shutdownSequence = [];
+	protected array $shutdownSequence = [];
 
-	public function getLevel(): ?Level{
-		if($this->lobbyLevel === null){
-			return $this->level;
-		}else{
-			return $this->lobbyLevel;
-		}
+	public function getWorld(): ?World{
+	  return $this->lobbyWorld;
 	}
 
 	public function __construct(Plugin $plugin){
@@ -156,7 +139,7 @@ abstract class Arena implements ShutdownSequence {
 
 	public abstract function getMapName(): string;
 
-	public abstract function getLevelName(): string;
+	public abstract function getWorldName(): string;
 
 	public abstract function getArenaTask(): ArenaTickTask;
 
@@ -229,7 +212,7 @@ abstract class Arena implements ShutdownSequence {
 		$pm = $this->getPlayerManager();
 		$qm = $this->getQueueManager();
 
-		// Attempt to load the level while the level is offline.
+		// Attempt to load the world while the world is offline.
 		if($this->hasFlags(self::ARENA_OFFLINE_MODE)){
 			// Only load world when the queue is not empty-
 			if(!$this->hasFlags(self::WORLD_ATTEMPT_LOAD) && $qm->hasQueue()){
@@ -266,7 +249,7 @@ abstract class Arena implements ShutdownSequence {
 		// Attempt to reset the world when there is no players in the arena,
 		// this is to avoid unnecessary ticks on this world.
 		if(!$this->hasFlags(self::ARENA_OFFLINE_MODE) && $pm->getPlayersCount() === 0){
-			if($this->deleteTimeout >= 30 && !$this->level->isClosed()){
+			if($this->deleteTimeout >= 30 && !$this->world->isClosed()){
 				$this->resetWorld();
 			}
 
@@ -282,11 +265,11 @@ abstract class Arena implements ShutdownSequence {
 
 	final public function resetWorld(): void{
 		// The sequence of deleting the arena.
-		$task = new AsyncDirectoryDelete([$this->lobbyLevel, $this->level], function(){
+		$task = new AsyncDirectoryDelete([$this->lobbyWorld, $this->world], function(){
 			$this->setFlags(self::ARENA_OFFLINE_MODE, true);
 
-			$this->level = null;
-			$this->lobbyLevel = null;
+			$this->world = null;
+			$this->lobbyWorld = null;
 			$this->deleteTimeout = 0;
 		});
 		LevelAsyncPool::getAsyncPool()->submitTask($task);
@@ -298,17 +281,17 @@ abstract class Arena implements ShutdownSequence {
 		// Lobby/Arena pre loading.
 		if($onStart){
 			if($this->lobbyName === null){
-				$fromPath = $this->plugin->getDataFolder() . 'arenas/worlds/' . $this->getLevelName() . ".zip";
-				$toPath = $this->plugin->getServer()->getDataPath() . "worlds/" . $this->getLevelName();
+				$fromPath = $this->plugin->getDataFolder() . 'arenas/worlds/' . $this->getWorldName() . ".zip";
+				$toPath = $this->plugin->getServer()->getDataPath() . "worlds/" . $this->getWorldName();
 			}else{
 				$fromPath = $this->plugin->getDataFolder() . 'arenas/worlds/' . $this->lobbyName . ".zip";
 				$toPath = $this->plugin->getServer()->getDataPath() . "worlds/" . $this->lobbyName;
 			}
 		}else{
-			if($this->lobbyName === null) return; // Do nothing because the level has already been loaded.
+			if($this->lobbyName === null) return; // Do nothing because the world has already been loaded.
 
-			$fromPath = $this->plugin->getDataFolder() . 'arenas/worlds/' . $this->getLevelName() . ".zip";
-			$toPath = $this->plugin->getServer()->getDataPath() . "worlds/" . $this->getLevelName();
+			$fromPath = $this->plugin->getDataFolder() . 'arenas/worlds/' . $this->getWorldName() . ".zip";
+			$toPath = $this->plugin->getServer()->getDataPath() . "worlds/" . $this->getWorldName();
 		}
 
 		if(is_file($this->plugin->getDataFolder() . 'arenas/worlds/')) return;
@@ -316,28 +299,28 @@ abstract class Arena implements ShutdownSequence {
 
 		$task = new CompressionAsyncTask([$fromPath, $toPath, false], function() use ($onStart){
 			if($this->lobbyName !== null && $onStart){
-				Server::getInstance()->loadLevel($this->lobbyName);
+				Server::getInstance()->getWorldManager()->loadWorld($this->lobbyName);
 
-				$level = $this->lobbyLevel = Server::getInstance()->getLevelByName($this->lobbyName);
-				$this->lobbyLevel->setAutoSave(false);
+				$world = $this->lobbyWorld = Server::getInstance()->getWorldManager()->getWorldByName($this->lobbyName);
+				$this->lobbyWorld->setAutoSave(false);
 
 				$isLobby = true;
 			}else{
-				Server::getInstance()->loadLevel($this->getLevelName());
+				Server::getInstance()->getWorldManager()->loadWorld($this->getWorldName());
 
-				$level = $this->level = Server::getInstance()->getLevelByName($this->getLevelName());
-				$this->level->setAutoSave(false);
+				$world = $this->world = Server::getInstance()->getWorldManager()->getWorldByName($this->getWorldName());
+				$this->world->setAutoSave(false);
 
 				$isLobby = false;
 			}
 
-			$level->setTime(Level::TIME_DAY);
-			$level->stopTime();
+			$world->setTime(World::TIME_DAY);
+			$world->stopTime();
 
 			$this->setFlags(self::ARENA_OFFLINE_MODE, false);
 			$this->setFlags(self::WORLD_ATTEMPT_LOAD, false);
 
-			$this->initArena($level, $isLobby);
+			$this->initArena($world, $isLobby);
 
 			// Process queue immediately...
 			$this->processQueue();
@@ -360,10 +343,10 @@ abstract class Arena implements ShutdownSequence {
 	 * Perform appropriate execution after the arena world has
 	 * successfully being copied and loaded.
 	 *
-	 * @param Level $level
+	 * @param World $world
 	 * @param bool $isLobby
 	 */
-	public function initArena(Level $level, bool $isLobby): void{
+	public function initArena(World $world, bool $isLobby): void{
 		// NOOP
 	}
 
@@ -387,9 +370,9 @@ abstract class Arena implements ShutdownSequence {
 
 		$cage = $this->getCageManager()->setCage($player);
 		if($this->lobbyName !== null){
-			$player->teleport($this->level->getSafeSpawn());
+			$player->teleport($this->world->getSafeSpawn());
 		}else{
-			$player->teleport(Position::fromObject($cage, $this->level));
+			$player->teleport(Position::fromObject($cage, $this->world));
 		}
 
 		$player->getInventory()->clearAll();
@@ -408,9 +391,7 @@ abstract class Arena implements ShutdownSequence {
 		$player->getInventory()->setItem(4, self::getRejoinItem());
 		$player->getInventory()->setItem(8, self::getLeaveItem());
 
-		foreach($this->getPlayerManager()->getAllPlayers() as $p2) $p2->hidePlayer($player);
-
-		$player->setGamemode(Player::SPECTATOR);
+		$player->setGamemode(GameMode::SPECTATOR());
 		self::sendAdventureSettings($player);
 	}
 
@@ -474,41 +455,22 @@ abstract class Arena implements ShutdownSequence {
 	}
 
 	public static function getLeaveItem(): Item{
-		return ItemFactory::get(ItemIds::BED, 14)->setCustomName("§r§cLeave the game.");
+	  return VanillaBlocks::BED()->setColor(DyeColor::RED())->asItem()->setCustomName("§r§cLeave the game.");
 	}
 
 	public static function getSpectatorItem(): Item{
-		return ItemFactory::get(ItemIds::PAPER)->setCustomName("§r§eTeleport to player");
+	  return VanillaItems::PAPER()->setCustomName("§r§eTeleport to player");
 	}
 	
 	public static function getRejoinItem(): Item{
-		return ItemFactory::get(ItemIds::ENDER_EYE)->setCustomName("§r§bPlay Again.");
+	  return VanillaItems::BLAZE_POWDER()->setCustomName("§r§bPlay Again.");
 	}
 
 	public static function getKitSelector(): Item{
-		return ItemFactory::get(ItemIds::BOOK)->setCustomName("§r§aKits selection");
+		return VanillaItems::BOOK()->setCustomName("§r§aKits selection");
 	}
 
 	public function getScoreboard(): Scoreboard{
 		return $this->scoreboard;
-	}
-
-	public static function sendAdventureSettings(Player $player): void{
-		$player->setAllowFlight(true);
-
-		$pk = new AdventureSettingsPacket();
-
-		$pk->setFlag(AdventureSettingsPacket::WORLD_IMMUTABLE, true);
-		$pk->setFlag(AdventureSettingsPacket::NO_PVP, true);
-		$pk->setFlag(AdventureSettingsPacket::AUTO_JUMP, $player->hasAutoJump());
-		$pk->setFlag(AdventureSettingsPacket::ALLOW_FLIGHT, $player->getAllowFlight());
-		$pk->setFlag(AdventureSettingsPacket::NO_CLIP, false);
-		$pk->setFlag(AdventureSettingsPacket::FLYING, $player->isFlying());
-
-		$pk->commandPermission = ($player->isOp() ? AdventureSettingsPacket::PERMISSION_OPERATOR : AdventureSettingsPacket::PERMISSION_NORMAL);
-		$pk->playerPermission = ($player->isOp() ? PlayerPermissions::OPERATOR : PlayerPermissions::MEMBER);
-		$pk->entityUniqueId = $player->getId();
-
-		$player->dataPacket($pk);
 	}
 }
