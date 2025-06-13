@@ -37,7 +37,7 @@ use pocketmine\event\entity\EntityDamageEvent;
 use pocketmine\event\inventory\InventoryCloseEvent;
 use pocketmine\event\inventory\InventoryOpenEvent;
 use pocketmine\event\player\PlayerChatEvent;
-use pocketmine\event\player\PlayerCommandPreprocessEvent;
+use pocketmine\event\server\CommandEvent;
 use pocketmine\event\player\PlayerExhaustEvent;
 use pocketmine\event\player\PlayerInteractEvent;
 use pocketmine\event\player\PlayerMoveEvent;
@@ -122,7 +122,7 @@ class ArenaListener {
 		// NOOP
 	}
 
-	public function onPlayerExecuteCommand(PlayerCommandPreprocessEvent $ev): void{
+	public function onPlayerExecuteCommand(CommandEvent $ev): void{
 		// NOOP
 	}
 
