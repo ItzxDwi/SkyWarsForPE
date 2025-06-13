@@ -34,12 +34,13 @@ use larryTheCoder\database\SkyWarsDatabase;
 use larryTheCoder\SkyWarsPE;
 use larryTheCoder\utils\PlayerData;
 use pocketmine\entity\Entity;
-use pocketmine\event\entity\EntityLevelChangeEvent;
+use pocketmine\event\entity\EntityTeleportEvent;
+use pocketmine\entity\Location;
 use pocketmine\event\Listener;
 use pocketmine\event\player\PlayerJoinEvent;
-use pocketmine\level\Level;
+use pocketmine\world\World;
 use pocketmine\math\Vector3;
-use pocketmine\Player;
+use pocketmine\player\Player;
 use pocketmine\scheduler\Task;
 use poggit\libasynql\SqlError;
 
@@ -50,8 +51,8 @@ class PedestalManager extends Task implements Listener {
 
 	/** @var FakeHuman[] */
 	private $npcLocations = [];
-	/** @var Level */
-	private $level;
+	/** @var World */
+	private $world;
 	/** @var array<int, array<string|int>> */
 	private $totalResult = [];
 	/** @var bool */
@@ -59,18 +60,18 @@ class PedestalManager extends Task implements Listener {
 
 	/**
 	 * @param Vector3[] $vectors
-	 * @param Level $level
+	 * @param World $world
 	 */
-	public function __construct(array $vectors, Level $level){
-		$this->fetchData(function() use ($vectors, $level): void{
+	public function __construct(array $vectors, World $world){
+		$this->fetchData(function() use ($vectors, $world): void{
 			foreach($vectors as $key => $vec){
-				$entity = new FakeHuman($level, Entity::createBaseNBT($vec), $key + 1);
+				$entity = new FakeHuman(Location::fromObject($vec, $world), null, $key + 1);
 				$entity->spawnToAll();
 
 				$this->npcLocations[] = $entity;
 			}
 
-			$this->level = $level;
+			$this->world = $world;
 
 			SkyWarsPE::getInstance()->getScheduler()->scheduleRepeatingTask($this, 16 * 20);
 		});
@@ -78,21 +79,23 @@ class PedestalManager extends Task implements Listener {
 
 	public function closeAll(): void{
 		foreach($this->npcLocations as $npc){
-			$npc->close();
+			$npc->flagForDespawn();
 		}
 	}
 
 	/**
-	 * @param EntityLevelChangeEvent $event
+	 * @param EntityTeleportEvent $event
 	 * @priority HIGH
 	 */
-	public function onPlayerLevelChange(EntityLevelChangeEvent $event): void{
+	public function onPlayerWorldChange(EntityTeleportEvent $event): void{
 		$pl = $event->getEntity();
+		$origin = $event->getFrom()->getWorld();
+		$target = $event->getTo()->getWorld();
 
 		if($pl instanceof Player){
-			if($event->getOrigin()->getFolderName() === $this->level->getFolderName()){
+			if($origin->getFolderName() === $this->world->getFolderName()){
 				$this->despawnFrom($pl);
-			}elseif($event->getTarget()->getFolderName() === $this->level->getFolderName()){
+			}elseif($target->getFolderName() === $this->world->getFolderName()){
 				$this->spawnTo($pl);
 			}
 		}
@@ -103,7 +106,7 @@ class PedestalManager extends Task implements Listener {
 	 * @priority HIGH
 	 */
 	public function onPlayerJoinEvent(PlayerJoinEvent $event): void{
-		if($event->getPlayer()->getLevel()->getFolderName() === $this->level->getFolderName()){
+		if($event->getPlayer()->getWorld()->getFolderName() === $this->world->getFolderName()){
 			$this->spawnTo($event->getPlayer());
 		}
 	}
@@ -120,7 +123,7 @@ class PedestalManager extends Task implements Listener {
 		}
 	}
 
-	public function onRun(int $currentTick): void{
+	public function onRun(): void{
 		$this->fetchData();
 	}
 
@@ -141,11 +144,11 @@ class PedestalManager extends Task implements Listener {
 
 		SkyWarsDatabase::getEntries(function(?array $players) use ($onComplete): void{
 			// Avoid nulls and other consequences
-			$player = [
-				"Example-1" => 0,
-				"Example-2" => 0,
-				"Example-3" => 0,
-			];
+			$player = array_fill_keys([
+			  "Example-1",
+			  "Example-2",
+			  "element"
+			], 0);
 
 			/** @var PlayerData $value */
 			foreach($players as $value){
