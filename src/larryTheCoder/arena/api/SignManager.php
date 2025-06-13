@@ -33,16 +33,17 @@ namespace larryTheCoder\arena\api;
 use larryTheCoder\arena\api\impl\ArenaState;
 use larryTheCoder\arena\api\impl\ShutdownSequence;
 use larryTheCoder\arena\api\translation\TranslationContainer;
+use pocketmine\block\utils\SignText;
 use pocketmine\block\BlockIds;
 use pocketmine\block\StainedGlass;
 use pocketmine\event\block\BlockBreakEvent;
 use pocketmine\event\HandlerList;
 use pocketmine\event\Listener;
 use pocketmine\event\player\PlayerInteractEvent;
-use pocketmine\level\Position;
+use pocketmine\world\Position;
 use pocketmine\math\Vector3;
 use pocketmine\Server;
-use pocketmine\tile\Sign;
+use pocketmine\block\tile\Sign;
 use pocketmine\utils\TextFormat;
 
 /**
@@ -50,35 +51,30 @@ use pocketmine\utils\TextFormat;
  */
 class SignManager implements Listener, ShutdownSequence {
 
-	/** @var bool */
-	public static $blockStatus = true;
+	public static bool $blockStatus = true;
 
-	/** @var Vector3 */
-	private $signPosition;
-	/** @var string */
-	private $signLevelName;
+	private Vector3 $signPosition;
+	private string $signWorldName;
 
-	/** @var Arena */
-	private $arena;
-	/** @var string */
-	private $prefix;
+	private Arena $arena;
+	private string $prefix;
 
 	/** @var string[] */
-	private $cache = [];
+	private array $cache = [];
 	/** @var string[] */
-	private $updatedSign = [];
+	private array $updatedSign = [];
 
 	/** @var string[] */
-	private $signTemplate = [];
+	private array $signTemplate = [];
 	/** @var int[] */
-	private $delay = [];
+	private array $delay = [];
 
 	public function __construct(Arena $arena, Position $tilePosition, string $prefix = ""){
 		$this->arena = $arena;
 		$this->prefix = $prefix;
 
 		$this->signPosition = $tilePosition->asVector3();
-		$this->signLevelName = $tilePosition->getLevel()->getFolderName();
+		$this->signWorldName = $tilePosition->getWorld()->getFolderName();
 	}
 
 	private static function toReadable(Arena $arena): string{
@@ -126,11 +122,11 @@ class SignManager implements Listener, ShutdownSequence {
 
 		$qm = $this->arena->getQueueManager();
 
-		if(!$b->equals($this->signPosition) || $b->getLevel()->getFolderName() !== $this->signLevelName){
+		if(!$b->equals($this->signPosition) || $b->getWorld()->getFolderName() !== $this->signWorldName){
 			return;
 		}
 
-		$e->setCancelled();
+		$e->cancel();
 
 		// Improved queue method.
 		if(!$qm->inQueue($p) && $e->getAction() === PlayerInteractEvent::RIGHT_CLICK_BLOCK
@@ -158,11 +154,11 @@ class SignManager implements Listener, ShutdownSequence {
 	}
 
 	public function processSign(): void{
-		// Always retrieve freshly new level, in case it was unloaded last time.
-		$level = Server::getInstance()->getLevelByName($this->signLevelName);
-		if($level === null) return;
+		// Always retrieve freshly new world, in case it was unloaded last time.
+		$world = Server::getInstance()->getWorldManager()->getWorldByName($this->signWorldName);
+		if($world === null) return;
 
-		$signTile = $level->getTile($this->signPosition);
+		$signTile = $world->getTile($this->signPosition);
 
 		if(!($signTile instanceof Sign)) return;
 
@@ -174,7 +170,7 @@ class SignManager implements Listener, ShutdownSequence {
 				$this->arena->getMaxPlayer(),
 				$this->arena->getMinPlayer(),
 				TextFormat::ESCAPE,
-				$this->arena->getLevelName(),
+				$this->arena->getWorldName(),
 				$this->prefix,
 				$this->arena->getMapName(),
 			];
@@ -188,7 +184,7 @@ class SignManager implements Listener, ShutdownSequence {
 
 		foreach($this->updatedSign as $line => $text){
 			if(($this->cache[$line] ?? "") !== $text){
-				$signTile->setLine($line, $text);
+				$signTile->setText($line, $text);
 
 				$this->cache[$line] = $text;
 			}
@@ -214,15 +210,15 @@ class SignManager implements Listener, ShutdownSequence {
 		$block = $event->getBlock();
 
 		// How the hell this event hold a reference to unloaded level???
-		if(($level = $block->getLevel()) !== null && $level->getFolderName() === $this->signLevelName){
-			if($block->equals($this->signPosition)){
-				$event->setCancelled();
+		if(($world = $block->getPosition()->getWorld()) !== null && $world->getFolderName() === $this->signWorldName){
+			if($block->getPosition()->equals($this->signPosition)){
+				$event->cancel();
 			}else{
-				$signBlock = $level->getBlock($this->signPosition);
+				$signBlock = $world->getBlock($this->signPosition);
 				if($signBlock->getId() === BlockIds::WALL_SIGN){
 					$statusBlock = $signBlock->getSide($signBlock->getDamage() ^ 0x01);
-					if($block->equals($statusBlock)){
-						$event->setCancelled();
+					if($block->getPosition()->equals($statusBlock)){
+						$event->cancel();
 					}
 				}elseif($signBlock->getId() === BlockIds::SIGN_POST){
 					$blockUnder = $signBlock->getSide(Vector3::SIDE_DOWN);
