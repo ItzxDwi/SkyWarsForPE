@@ -36,7 +36,6 @@ use larryTheCoder\arena\api\impl\ArenaState;
 use larryTheCoder\arena\api\impl\ShutdownSequence;
 use larryTheCoder\utils\Utils;
 use pocketmine\scheduler\Task;
-use pocketmine\utils\MainLogger;
 use pocketmine\utils\TextFormat;
 use Throwable;
 
@@ -70,7 +69,7 @@ abstract class ArenaTickTask extends Task implements ShutdownSequence {
 			$this->getArena()->setFlags(Arena::ARENA_CRASHED, true);
 			$this->endTick();
 
-			MainLogger::getLogger()->logException($err);
+			$this->arena->getPlugin()->getLogger()->logException($err);
 		}
 	}
 
