@@ -36,7 +36,7 @@ class CombatLogger {
 	public const MAX_ENTRY = 50;
 
 	/** @var CombatEntry[][] */
-	public $players = [];
+	public array $players = [];
 
 	/**
 	 * Combat logger entry, this entries will be pushed into an array and the data will be stored
