@@ -43,7 +43,7 @@ use pocketmine\event\player\PlayerInteractEvent;
 use pocketmine\event\player\PlayerMoveEvent;
 use pocketmine\event\player\PlayerQuitEvent;
 use pocketmine\item\Item;
-use pocketmine\Player;
+use pocketmine\player\Player;
 
 /**
  * Arena listener class, you may want to extends this class in order to work properly.
@@ -52,12 +52,7 @@ use pocketmine\Player;
  */
 class ArenaListener {
 
-	/** @var Arena */
-	protected $arena;
-
-	public function __construct(Arena $arena){
-		$this->arena = $arena;
-	}
+	public function __construct(protected Arena $arena){}
 
 	public function onPlayerMove(PlayerMoveEvent $event): void{
 		// NOOP
