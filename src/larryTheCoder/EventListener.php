@@ -45,7 +45,7 @@ use pocketmine\utils\TextFormat;
 class EventListener extends BasicListener implements Listener {
 
 	/** @var bool[] */
-	public static $moderators = [];
+	public static array $moderators = [];
 
 	public function __construct(private SkyWarsPE $plugin){}
 
