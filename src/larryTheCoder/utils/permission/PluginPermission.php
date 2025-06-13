@@ -38,14 +38,13 @@ use pocketmine\event\Listener;
 use pocketmine\event\player\PlayerJoinEvent;
 use pocketmine\event\player\PlayerQuitEvent;
 use pocketmine\permission\PermissionAttachment;
-use pocketmine\Player;
+use pocketmine\player\Player;
 use pocketmine\utils\AssumptionFailedError;
 
 class PluginPermission implements Listener {
 	use SingletonTrait;
 
-	/** @var PermissionAttachment[] */
-	private $attachments;
+	private PermissionAttachment $attachments;
 
 	public function __construct(){
 		$this->attachments = [];
