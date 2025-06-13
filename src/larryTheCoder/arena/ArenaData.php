@@ -32,7 +32,7 @@ namespace larryTheCoder\arena;
 use larryTheCoder\arena\api\Arena;
 use larryTheCoder\arena\api\impl\ArenaState;
 use larryTheCoder\utils\Utils;
-use pocketmine\level\Position;
+use pocketmine\world\Position;
 use pocketmine\math\Vector3;
 use pocketmine\Server;
 
@@ -41,76 +41,73 @@ use pocketmine\Server;
  */
 abstract class ArenaData extends Arena {
 
-	/** @var int */
-	public $configVersion = 1;
-	/** @var string */
-	public $gameAPICodename = "Default API";
-	/** @var bool */
-	public $configChecked = false;
+	public int $configVersion = 1;
+
+	public string $gameAPICodename = "Default API";
+
+	public bool $configChecked = false;
 
 	// The root of the config.
-	/** @var bool */
-	public $arenaEnable = false;
-	/** @var string */
-	public $arenaFileName = "";
-	/** @var int */
-	public $arenaMode = ArenaState::MODE_SOLO;
+	public bool $arenaEnable = false;
+
+	public string $arenaFileName = "";
+
+	public int $arenaMode = ArenaState::MODE_SOLO;
 
 	// Winners section
 	/** @var string[][] */
-	public $winnersCommand = [];
+	public array $winnersCommand = [];
 
 	// Signs section.
-	/** @var bool */
-	public $enableJoinSign = false;
-	/** @var Vector3 */
-	public $joinSignVec = null;
-	/** @var string */
-	public $statusLine1 = "";
-	/** @var string */
-	public $statusLine2 = "";
-	/** @var string */
-	public $statusLine3 = "";
-	/** @var string */
-	public $statusLine4 = "";
-	/** @var string */
-	public $joinSignWorld = "";
-	/** @var int */
-	public $statusLineUpdate = 2;
+	public bool $enableJoinSign = false;
+
+	public ?Vector3 $joinSignVec = null;
+
+	public string $statusLine1 = "";
+
+	public string $statusLine2 = "";
+
+	public string $statusLine3 = "";
+
+	public string $statusLine4 = "";
+
+	public string $joinSignWorld = "";
+
+	public int $statusLineUpdate = 2;
 
 	// Chest section.
-	/** @var bool */
-	public $refillChest = true;
+
+	public bool $refillChest = true;
 	/** @var int[] */
-	public $refillAverage = [240];
+	public array $refillAverage = [240];
 
 	// Arena section.
-	/** @var int */
-	public $arenaTime = 0;
-	/** @var int */
-	public $arenaMatchTime = 0;
-	/** @var string */
-	public $arenaWorld = "";
-	/** @var Vector3 */
-	public $arenaSpecPos = null;
+
+	public int $arenaTime = 0;
+
+	public int $arenaMatchTime = 0;
+
+	public string $arenaWorld = "";
+
+	public ?Vector3 $arenaSpecPos = null;
 	/** @var Vector3[] */
-	public $spawnPedestals = [];
-	/** @var int */
-	public $maximumPlayers = 0;
-	/** @var int */
-	public $minimumPlayers = 0;
-	/** @var int */
-	public $arenaGraceTime = 0;
-	/** @var bool */
-	public $enableSpectator = false;
-	/** @var bool */
-	public $arenaStartOnFull = false;
+	public array $spawnPedestals = [];
+
+	public int $maximumPlayers = 0;
+
+	public int $minimumPlayers = 0;
+
+	public int $arenaGraceTime = 0;
+
+	public bool $enableSpectator = false;
+
+	public bool $arenaStartOnFull = false;
 	/** @var string[] */
-	public $arenaBroadcastTM = [];
-	/** @var int */
-	public $arenaMoneyReward = 0;
-	/** @var int */
-	public $arenaStartingTime = 0;
+	public array $arenaBroadcastTM = [];
+
+	public int $arenaMoneyReward = 0;
+
+	public int $arenaStartingTime = 0;
 
 	/**
 	 * Parses the data for the arena
@@ -220,9 +217,9 @@ abstract class ArenaData extends Arena {
 	public function getSignPosition(): Position{
 		Utils::loadFirst($this->joinSignWorld);
 
-		$level = Server::getInstance()->getLevelByName($this->joinSignWorld);
+		$world = Server::getInstance()->getWorldManager()->getWorldByName($this->joinSignWorld);
 
-		return Position::fromObject($this->joinSignVec, $level);
+		return Position::fromObject($this->joinSignVec, $world);
 	}
 
 }
