@@ -30,39 +30,46 @@ declare(strict_types = 1);
 
 namespace larryTheCoder\arena\api\task;
 
-use pocketmine\level\Level;
+use pmmp\thread\ThreadSafeArray;
 use pocketmine\scheduler\AsyncTask;
 use pocketmine\Server;
+use pocketmine\world\World;
 
 class AsyncDirectoryDelete extends AsyncTask {
 
 	/** @var string */
-	private $worldTable;
+	private string $worldTable;
 
 	/**
 	 * AsyncDirectoryDelete constructor.
 	 *
-	 * @param Level[]|null[] $worldToDelete
+	 * @param ThreadSafeArray $worldToDelete
 	 * @param callable|null $onComplete
 	 */
-	public function __construct(array $worldToDelete, ?callable $onComplete = null){
+	public function __construct(ThreadSafeArray $worldToDelete, ?callable $onComplete = null){
+	  $server = Server::getInstance();
+	  $worldManager = $server->getWorldManager();
 		$worlds = [];
-		foreach($worldToDelete as $level){
-			if($level === null) continue;
-			if(!$level->isClosed()) Server::getInstance()->unloadLevel($level, true);
+		foreach($worldToDelete as $worldName){
+		  $worlds[] = $server->getDataPath() . "worlds/" . $worldName;
 
-			$worlds[] = Server::getInstance()->getDataPath() . "worlds/" . $level->getFolderName();
+		  $world = $worldManager->getWorldByName($worldName);
+		  if ($world === null || $world->isClosed()) {
+		    continue;
+		  }
+
+		   $worldManager->unloadWorld($world, true);
 		}
-		$this->worldTable = serialize($worlds);
+		$this->worldTable = igbinary_serialize($worlds);
 
-		$this->storeLocal($onComplete);
+		$this->storeLocal("onCompletion", $onCompletion);
 	}
 
 	public function onRun(): void{
-		$worldToDelete = unserialize($this->worldTable);
+		$worldToDelete = igbinary_unserialize($this->worldTable);
 
-		foreach($worldToDelete as $level){
-			self::deleteDirectory($level);
+		foreach($worldToDelete as $world){
+			self::deleteDirectory($world);
 		}
 	}
 
@@ -89,10 +96,10 @@ class AsyncDirectoryDelete extends AsyncTask {
 		return rmdir($dir);
 	}
 
-	public function onCompletion(Server $server): void{
-		$call = $this->fetchLocal();
-		if($call === null) return;
+	public function onCompletion(): void{
+		$onCompletion = $this->fetchLocal("onCompletion");
+		if($onCompletion === null) return;
 
-		$call();
+		$onCompletion();
 	}
 }
