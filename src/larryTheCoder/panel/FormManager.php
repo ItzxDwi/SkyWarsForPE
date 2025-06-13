@@ -52,14 +52,14 @@ use larryTheCoder\utils\cage\CageManager;
 use larryTheCoder\utils\PlayerData;
 use larryTheCoder\utils\Settings;
 use larryTheCoder\worker\LevelAsyncPool;
+use pmmp\thread\ThreadSafeArray;
 use pocketmine\block\Slab;
 use pocketmine\event\block\BlockBreakEvent;
 use pocketmine\event\Listener;
 use pocketmine\item\Item;
-use pocketmine\item\ItemFactory;
-use pocketmine\item\ItemIds;
-use pocketmine\level\Level;
-use pocketmine\Player;
+use pocketmine\item\VanillaItems;
+use pocketmine\world\World;
+use pocketmine\player\Player;
 use pocketmine\Server;
 use pocketmine\utils\Config;
 
@@ -71,16 +71,15 @@ class FormManager implements Listener {
 	private const SET_NPC_COORDINATES = 3;
 	private const TELEPORT_TO_WORLD = 4;
 
-	/** @var SkyWarsPE */
-	private $plugin;
+	private SkyWarsPE $plugin;
 	/** @var ArenaImpl[] */
-	private $arenaSetup = [];
+	private array $arenaSetup = [];
 	/** @var int[] */
-	private $blockEvent = [];
+	private array $blockEvent = [];
 	/** @var int[] */
-	private $spawnCache = [];
+	private array $spawnCache = [];
 	/** @var array<string, array<int|Item>> */
-	private $lastHoldIndex = [];
+	private array $lastHoldIndex = [];
 
 	public function __construct(SkyWarsPE $plugin){
 		$this->plugin = $plugin;
@@ -155,14 +154,14 @@ class FormManager implements Listener {
 		// Proper way to do this instead of foreach.
 		$files = array_filter(scandir($worldPath), function($file) use ($worldPath): bool{
 			if($file === "." || $file === ".." ||
-				Server::getInstance()->getDefaultLevel()->getFolderName() === $file ||
+				Server::getInstance()->getWorldManager()->getDefaultWorld()->getFolderName() === $file ||
 				is_file($worldPath . $file)){
 
 				return false;
 			}
 
 			return empty(array_filter($this->plugin->getArenaManager()->getArenas(), function($arena) use ($file): bool{
-				return $arena->getLevelName() === $file;
+				return $arena->getWorldName() === $file;
 			}));
 		});
 
@@ -183,7 +182,7 @@ class FormManager implements Listener {
 			$am = $this->plugin->getArenaManager();
 
 			$arenaName = (string)$response->getInput()->getValue();
-			$arenaLevel = (string)$response->getDropdown()->getSelectedOption();
+			$arenaWorld = (string)$response->getDropdown()->getSelectedOption();
 			$maxPlayer = (int)$response->getSlider()->getValue();
 			$minPlayer = (int)$response->getSlider()->getValue();
 			$spectator = (bool)$response->getToggle()->getValue();
@@ -200,24 +199,25 @@ class FormManager implements Listener {
 			// Faster way to get around variables.
 			$arena = $am->createArena($arenaName);
 			$arena->setConfig($arena->getConfigManager()
-				->setArenaWorld($arenaLevel)
+				->setArenaWorld($arenaWorld)
 				->setArenaName($arenaName)
 				->enableSpectator($spectator)
 				->setPlayersCount($maxPlayer > $minPlayer ? $maxPlayer : $minPlayer, $minPlayer)
 				->startOnFull($startWhenFull)
 				->saveArena(), true);
 
-			// Unload the level, this is needed in order to copy the arena worlds
+			// Unload the world, this is needed in order to copy the arena worlds
 			// into directive arenas plugin's path world directory.
-			$level = Server::getInstance()->getLevelByName($arenaLevel);
-			if($level !== null) Server::getInstance()->unloadLevel($level, true);
+			$world = Server::getInstance()->getWorldManager()->getWorldByName($arenaWorld);
+			if($world !== null) Server::getInstance()->getWorldManager()->unloadWorld($world, true);
 
 			// Copy files to the directive location, then we put on the modal form in next tick.
-			$task = new CompressionAsyncTask([
-				Server::getInstance()->getDataPath() . "worlds/" . $arenaLevel,
-				$this->plugin->getDataFolder() . 'arenas/worlds/' . $arenaLevel . ".zip",
-				true,
-			], function() use ($player, $arena){
+			$task = new CompressionAsyncTask(
+			  ThreadSafeArray::fromArray([
+				 Server::getInstance()->getDataPath() . "worlds/" . $arenaWorld,
+				 $this->plugin->getDataFolder() . 'arenas/worlds/' . $arenaWorld . ".zip",
+				 true,
+			]), function() use ($player, $arena){
 				$form = new ModalForm(TC::getTranslation($player, 'setup-arena-spawn-1'), TC::getTranslation($player, 'setup-arena-spawn-2'),
 					function(Player $player, bool $response) use ($arena): void{
 						if($response){
@@ -438,10 +438,10 @@ class FormManager implements Listener {
 	}
 
 	public function setupSpawn(Player $player, ArenaImpl $arena): void{
-		$this->performWorldCopy($arena, function(Level $level) use ($player, $arena): void{
+		$this->performWorldCopy($arena, function(World $world) use ($player, $arena): void{
 			$this->setMagicWand($player);
 
-			$player->teleport($level->getSpawnLocation());
+			$player->teleport($world->getSpawnLocation());
 			$player->sendMessage(TC::getTranslation($player, "setup-arena-spawn"));
 
 			$arena->getConfigManager()->resetSpawnPedestal();
@@ -452,10 +452,10 @@ class FormManager implements Listener {
 	}
 
 	public function setupSpectator(Player $player, ArenaImpl $arena): void{
-		$this->performWorldCopy($arena, function(Level $level) use ($player, $arena): void{
+		$this->performWorldCopy($arena, function(World $world) use ($player, $arena): void{
 			$this->setMagicWand($player);
 
-			$player->teleport($level->getSpawnLocation());
+			$player->teleport($world->getSpawnLocation());
 			$player->sendMessage(TC::getTranslation($player, "setup-arena-spectator"));
 
 			$this->arenaSetup[$player->getName()] = $arena;
@@ -464,10 +464,10 @@ class FormManager implements Listener {
 	}
 
 	public function teleportWorld(Player $player, ArenaImpl $arena): void{
-		$this->performWorldCopy($arena, function(Level $level) use ($player, $arena): void{
+		$this->performWorldCopy($arena, function(World $world) use ($player, $arena): void{
 			$this->setMagicWand($player);
 
-			$player->teleport($level->getSpawnLocation());
+			$player->teleport($world->getSpawnLocation());
 			$player->sendMessage(TC::getTranslation($player, "edit-world"));
 
 			$this->arenaSetup[$player->getName()] = $arena;
@@ -645,25 +645,26 @@ class FormManager implements Listener {
 	 * @param callable $onComplete
 	 */
 	private function performWorldCopy(ArenaImpl $arena, callable $onComplete): void{
-		$level = Server::getInstance()->getLevelByName($arena->getLevelName());
-		if($level !== null) Server::getInstance()->unloadLevel($level, true);
+		$world = Server::getInstance()->getWorldManager()->getWorldByName($arena->getWorldName());
+		if($world !== null) Server::getInstance()->getWorldManager()->unloadWorld($world, true);
 
-		$task = new CompressionAsyncTask([
-			$this->plugin->getDataFolder() . 'arenas/worlds/' . $arena->getLevelName() . ".zip",
-			Server::getInstance()->getDataPath() . "worlds/" . $arena->getLevelName(),
-			false,
-		], function() use ($arena, $onComplete){
-			Server::getInstance()->loadLevel($arena->getLevelName());
+		$task = new CompressionAsyncTask(
+		  ThreadSafeArray::fromArray([
+			 $this->plugin->getDataFolder() . 'arenas/worlds/' . $arena->getWorldName() . ".zip",
+			 Server::getInstance()->getDataPath() . "worlds/" . $arena->getWorldName(),
+			 false,
+		]), function() use ($arena, $onComplete){
+			Server::getInstance()->getWorldManager()->loadWorld($arena->getWorldName());
 
-			$level = Server::getInstance()->getLevelByName($arena->getLevelName());
-			$level->setAutoSave(false);
+			$world = Server::getInstance()->getWorldManager()->getWorldByName($arena->getWorldName());
+			$world->setAutoSave(false);
 
-			$level->setTime(Level::TIME_DAY);
-			$level->stopTime();
+			$world->setTime(World::TIME_DAY);
+			$world->stopTime();
 
 			$arena->setFlags(ArenaImpl::ARENA_IN_SETUP_MODE, true);
 
-			$onComplete($level);
+			$onComplete($world);
 		});
 
 		LevelAsyncPool::getAsyncPool()->submitTask($task);
@@ -707,7 +708,7 @@ class FormManager implements Listener {
 	private function setMagicWand(Player $p): void{
 		$this->lastHoldIndex[$p->getName()] = [$p->getInventory()->getHeldItemIndex(), $p->getInventory()->getHotbarSlotItem(0)];
 
-		$p->setGamemode(1);
+		$p->setGamemode(GameMode::CREATIVE());
 		$p->getInventory()->setHeldItemIndex(0);
 		$p->getInventory()->setItemInHand($this->getMagicWand());
 	}
@@ -725,21 +726,21 @@ class FormManager implements Listener {
 
 			switch($this->blockEvent[$player->getName()]){
 				case self::SET_SPAWN_COORDINATES:
-					if($arena->getLevelName() !== $player->getLevel()->getFolderName()){
-						$player->sendMessage(TC::getTranslation($player, 'setup-wrong-world-1', ["{ARENA_WORLD}", $arena->getLevelName()]));
+					if($arena->getWorldName() !== $player->getWorld()->getFolderName()){
+						$player->sendMessage(TC::getTranslation($player, 'setup-wrong-world-1', ["{ARENA_WORLD}", $arena->getWorldName()]));
 						break;
 					}
 
 					$mode = $this->spawnCache[$player->getName()] ?? 1;
 
 					if($mode <= $arena->getMaxPlayer()){
-						$config->setSpawnPosition([$block->getX(), $block->getY() + 1, $block->getZ()], $mode);
+						$config->setSpawnPosition([$block->getPosition()->getX(), $block->getPosition()->getY() + 1, $block->getPosition()->getZ()], $mode);
 
 						$player->sendMessage(str_replace("{COUNT}", (string)$mode, TC::getTranslation($player, 'panel-spawn-pos')));
 
 						if($mode === $arena->getMaxPlayer()){
 							$player->sendMessage(TC::getTranslation($player, "panel-spawn-set"));
-							$player->teleport($this->plugin->getServer()->getDefaultLevel()->getSafeSpawn(), 0, 0);
+							$player->teleport($this->plugin->getServer()->getWorldManager()->getDefaultWorld()->getSafeSpawn());
 
 							$this->cleanupEvent($player, true);
 							break;
@@ -749,15 +750,15 @@ class FormManager implements Listener {
 					}
 					break;
 				case self::SET_SPECTATOR_COORDINATES:
-					if($arena->getLevelName() !== $player->getLevel()->getFolderName()){
-						$player->sendMessage(TC::getTranslation($player, 'setup-wrong-world-1', ["{ARENA_WORLD}", $arena->getLevelName()]));
+					if($arena->getWorldName() !== $player->getWorld()->getFolderName()){
+						$player->sendMessage(TC::getTranslation($player, 'setup-wrong-world-1', ["{ARENA_WORLD}", $arena->getWorldName()]));
 						break;
 					}
 
-					$config->setSpecSpawn($block->getX(), $block->getY(), $block->getZ());
+					$config->setSpecSpawn($block->getPosition()->getX(), $block->getPosition()->getY(), $block->getPosition()->getZ());
 
 					$player->sendMessage(TC::getTranslation($player, 'panel-join-spect'));
-					$player->teleport($this->plugin->getServer()->getDefaultLevel()->getSafeSpawn(), 0, 0);
+					$player->teleport($this->plugin->getServer()->getWorldManager()->getDefaultWorld()->getSafeSpawn());
 
 					$this->cleanupEvent($player, true);
 					break;
@@ -767,7 +768,7 @@ class FormManager implements Listener {
 						break;
 					}
 
-					$config->setJoinSign($block->getX(), $block->getY(), $block->getZ(), $block->level->getFolderName());
+					$config->setJoinSign($block->getPosition()->getX(), $block->getPosition()->getY(), $block->getPosition()->getZ(), $block->getPosition()->getWorld()->getFolderName());
 
 					$player->sendMessage(TC::getTranslation($player, 'panel-join-sign'));
 
@@ -785,7 +786,7 @@ class FormManager implements Listener {
 					if($mode <= 3){
 						$y = $block instanceof Slab ? 0.5 : 1;
 
-						$config->set("npc-$mode", [$block->getX() + .5, $block->getY() + $y, $block->getZ() + .5, $block->level->getFolderName()]);
+						$config->set("npc-$mode", [$block->getPosition()->getX() + .5, $block->getPosition()->getY() + $y, $block->getPosition()->getZ() + .5, $block->getPosition()->getWorld()->getFolderName()]);
 						$config->save();
 
 						$player->sendMessage(str_replace("{COUNT}", (string)$mode, TC::getTranslation($player, 'panel-spawn-pos')));
@@ -793,7 +794,7 @@ class FormManager implements Listener {
 						$this->spawnCache[$player->getName()] = ++$mode;
 					}else{
 						$player->sendMessage(TC::getTranslation($player, "panel-spawn-set"));
-						$player->teleport($this->plugin->getServer()->getDefaultLevel()->getSafeSpawn(), 0, 0);
+						$player->teleport($this->plugin->getServer()->getWorldManager()->getDefaultWorld()->getSafeSpawn());
 
 						$this->cleanupEvent($player);
 					}
@@ -801,25 +802,26 @@ class FormManager implements Listener {
 				case self::TELEPORT_TO_WORLD:
 					$player->sendMessage(Settings::$prefix . TC::getTranslation($player, 'world-teleport'));
 
-					$player->teleport($this->plugin->getServer()->getDefaultLevel()->getSafeSpawn(), 0, 0);
+					$player->teleport($this->plugin->getServer()->getWorldManager()->getDefaultWorld()->getSafeSpawn());
 
-					$level = Server::getInstance()->getLevelByName($arena->getLevelName());
-					$level->save(true);
+					$world = Server::getInstance()->getWorldManager()->getWorldByName($arena->getWorldName());
+					$world->save(true);
 
-					Server::getInstance()->unloadLevel($level, true);
+					Server::getInstance()->getWorldManager()->unloadWorld($world, true);
 
-					$task = new CompressionAsyncTask([
-						Server::getInstance()->getDataPath() . "worlds/" . $arena->getLevelName(),
-						$this->plugin->getDataFolder() . 'arenas/worlds/' . $arena->getLevelName() . ".zip",
-						true,
-					], function() use ($player){
+					$task = new CompressionAsyncTask(
+					  ThreadSafeArray::fromArray([
+						 Server::getInstance()->getDataPath() . "worlds/" . $arena->getWorldName(),
+						 $this->plugin->getDataFolder() . 'arenas/worlds/' . $arena->getWorldName() . ".zip",
+						 true,
+					]), function() use ($player){
 						$this->cleanupEvent($player, true);
 					});
 
 					LevelAsyncPool::getAsyncPool()->submitTask($task);
 			}
 
-			$event->setCancelled();
+			$event->cancel();
 		}
 	}
 
@@ -829,8 +831,8 @@ class FormManager implements Listener {
 			$arena->setConfig($arena->getConfigManager()->saveArena(), true);
 			$arena->setFlags(ArenaImpl::ARENA_IN_SETUP_MODE, false);
 
-			if($cleanWorld && ($level = Server::getInstance()->getLevelByName($arena->getLevelName())) !== null){
-				LevelAsyncPool::getAsyncPool()->submitTask(new AsyncDirectoryDelete([$level]));
+			if($cleanWorld && ($world = Server::getInstance()->getWorldManager()->getWorldByName($arena->getWorldName())) !== null){
+				LevelAsyncPool::getAsyncPool()->submitTask(new AsyncDirectoryDelete(ThreadSafeArray::fromArray([$world])));
 			}
 		}
 
@@ -838,7 +840,7 @@ class FormManager implements Listener {
 			$holdIndex = $this->lastHoldIndex[$player->getName()][0];
 			$lastItem = $this->lastHoldIndex[$player->getName()][1];
 
-			$player->getInventory()->setItem(0, $lastItem ?? ItemFactory::get(ItemIds::AIR));
+			$player->getInventory()->setItem(0, $lastItem ?? VanillaItems::AIR());
 			$player->getInventory()->setHeldItemIndex($holdIndex);
 
 			unset($this->lastHoldIndex[$player->getName()]);
@@ -850,6 +852,6 @@ class FormManager implements Listener {
 	}
 
 	private function getMagicWand(): Item{
-		return ItemFactory::get(ItemIds::BLAZE_ROD);
+	  return VanillaItems::BLAZE_ROD();
 	}
 }
