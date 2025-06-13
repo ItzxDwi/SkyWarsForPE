@@ -49,19 +49,12 @@ use Throwable;
  */
 abstract class ArenaTickTask extends Task implements ShutdownSequence {
 
-	/** @var int */
-	protected $timeElapsed = 0;
-	/** @var int */
-	protected $countdown = 30;
+	protected int $timeElapsed = 0;
+	protected int $countdown = 30;
 
-	/** @var Arena */
-	private $arena;
-	/** @var bool */
-	private $hasEnded = false;
+	private bool $hasEnded = false;
 
-	public function __construct(Arena $arena){
-		$this->arena = $arena;
-	}
+	public function __construct(private Arena $arena){}
 
 	final public function onRun(int $currentTick): void{
 		$this->getArena()->getSignManager()->processSign();
