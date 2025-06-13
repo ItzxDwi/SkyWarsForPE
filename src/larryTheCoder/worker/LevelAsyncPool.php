@@ -35,17 +35,16 @@ use pocketmine\scheduler\AsyncPool;
 use pocketmine\scheduler\ClosureTask;
 use pocketmine\scheduler\GarbageCollectionTask;
 use pocketmine\Server;
-use pocketmine\utils\MainLogger;
 
 // According to dylan, never perform IO operations in PMMP async pool,
 // since it will lag the server if the server enables packet compression.
 class LevelAsyncPool extends AsyncPool {
 
-	/** @var LevelAsyncPool */
-	private static $instance;
+	private static LevelAsyncPool $instance;
 
 	public function __construct(SkyWarsPE $plugin, int $workerSize){
-		parent::__construct(Server::getInstance(), $workerSize, 255, Server::getInstance()->getLoader(), MainLogger::getLogger());
+	  $server = Server::getInstance();
+		parent::__construct($workerSize, 256, $server->getLoader(), $server->getLogger(), $server->getTickSleeper());
 
 		$plugin->getScheduler()->scheduleRepeatingTask(new ClosureTask(function(int $currentTick): void{
 			if(($w = $this->shutdownUnusedWorkers()) > 0){
@@ -56,7 +55,7 @@ class LevelAsyncPool extends AsyncPool {
 			}
 		}), 30 * 60 * 20);
 
-		$plugin->getScheduler()->scheduleRepeatingTask(new ClosureTask(function(int $currentTick): void{
+		$plugin->getScheduler()->scheduleRepeatingTask(new ClosureTask(function(): void{
 			$this->collectTasks();
 		}), 1);
 
