@@ -34,7 +34,7 @@ use pocketmine\network\mcpe\protocol\RemoveObjectivePacket;
 use pocketmine\network\mcpe\protocol\SetDisplayObjectivePacket;
 use pocketmine\network\mcpe\protocol\SetScorePacket;
 use pocketmine\network\mcpe\protocol\types\ScorePacketEntry;
-use pocketmine\Player;
+use pocketmine\player\Player;
 use pocketmine\Server;
 
 class StandardScoreboard {
@@ -58,7 +58,7 @@ class StandardScoreboard {
 	/** @var string */
 	public const SLOT_BELOW_NAME = "belowname";
 	/** @var array<string, string> */
-	private static $scoreboards = [];
+	private static array $scoreboards = [];
 
 	/**
 	 * Adds a Scoreboard to the player if he doesn't have one.
@@ -80,7 +80,7 @@ class StandardScoreboard {
 		$pk->displayName = $displayName;
 		$pk->criteriaName = self::criteriaName;
 		$pk->sortOrder = $slotOrder;
-		$player->sendDataPacket($pk);
+		$player->getNetworkSession()->sendDataPacket($pk);
 
 		self::$scoreboards[$player->getName()] = self::objectiveName;
 	}
@@ -95,7 +95,7 @@ class StandardScoreboard {
 
 		$pk = new RemoveObjectivePacket();
 		$pk->objectiveName = $objectiveName;
-		$player->sendDataPacket($pk);
+		$player->getNetworkSession()->sendDataPacket($pk);
 
 		if(isset(self::$scoreboards[($player->getName())])){
 			unset(self::$scoreboards[$player->getName()]);
@@ -151,13 +151,13 @@ class StandardScoreboard {
 		$pk = new SetScorePacket();
 		$pk->type = SetScorePacket::TYPE_REMOVE;
 		$pk->entries[] = $entry;
-		$player->sendDataPacket($pk);
+		$player->getNetworkSession()->sendDataPacket($pk);
 
 		if($message !== null){
 			$pk = new SetScorePacket();
 			$pk->type = SetScorePacket::TYPE_CHANGE;
 			$pk->entries[] = $entry;
-			$player->sendDataPacket($pk);
+			$player->getNetworkSession()->sendDataPacket($pk);
 		}
 	}
 }
