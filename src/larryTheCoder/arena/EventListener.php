@@ -49,19 +49,17 @@ use pocketmine\event\player\PlayerChatEvent;
 use pocketmine\event\player\PlayerCommandPreprocessEvent;
 use pocketmine\event\player\PlayerExhaustEvent;
 use pocketmine\event\player\PlayerQuitEvent;
-use pocketmine\inventory\ChestInventory;
+use pocketmine\block\inventory\ChestInventory;
 use pocketmine\item\Item;
-use pocketmine\item\ItemFactory;
-use pocketmine\item\ItemIds;
-use pocketmine\Player;
+use pocketmine\item\VanillaItems;
+use pocketmine\player\chat\LegacyRawChatFormatter;
+use pocketmine\player\Player;
 use pocketmine\utils\TextFormat;
 
 class EventListener extends ArenaListener {
 
-	/** @var CombatLogger */
-	private $logger;
-	/** @var ArenaImpl */
-	protected $arena;
+	private CombatLogger $logger;
+	protected ArenaImpl $arena;
 
 	public function __construct(ArenaImpl $arena){
 		parent::__construct($arena);
@@ -86,17 +84,28 @@ class EventListener extends ArenaListener {
 				if($substr !== "!"){
 					$recipients = $pm->getTeammates($player, false);
 
-					$event->setFormat($color . "[TEAM] " . $player->getNameTag() . ": " . TextFormat::RESET . $event->getMessage());
+					$event->setFormatter(new LegacyRawChatFormatter(
+					   $color . "[TEAM] {%0}: " . TextFormat::RESET . "{%1}"
+					 ));
 				}else{
-					$event->setFormat($player->getNameTag() . ": " . TextFormat::RESET . substr($event->getMessage(), 1));
+				  $message = substr($event->getMessage(), 1); // Remove first character
+				  $event->setMessage($message);
+
+				  $event->setFormatter(new LegacyRawChatFormatter(
+				     "{%0}: " . TextFormat::RESET . "{%1}"
+				  ));
 				}
 			}else{
-				$event->setFormat(TextFormat::GOLD . $player->getName() . ": " . TextFormat::RESET . $event->getMessage());
+			  $event->setFormatter(new LegacyRawChatFormatter(
+			     TextFormat::GOLD . "{%0}: " . TextFormat::RESET . "{%1}"
+			  ));
 			}
 		}else{
 			$recipients = $pm->getSpectators();
 
-			$event->setFormat(TextFormat::GRAY . "[DEAD] " . $player->getName() . ": " . $event->getMessage());
+			$event->setFormatter(new LegacyRawChatFormatter(
+			   TextFormat::GRAY . "[DEAD] {%0}: {%1}"
+			));
 		}
 
 		$event->setRecipients($recipients);
@@ -108,7 +117,7 @@ class EventListener extends ArenaListener {
 
 		// Do not exhaust spectators.
 		if($player instanceof Player && ($pm->isSpectator($player) || $this->arena->getStatus() !== ArenaState::STATE_ARENA_RUNNING)){
-			$event->setCancelled();
+			$event->cancel();
 		}
 	}
 
@@ -133,7 +142,7 @@ class EventListener extends ArenaListener {
 
 		$pm = $this->arena->getPlayerManager();
 		if($this->arena->hasFlags(ArenaImpl::ARENA_INVINCIBLE_PERIOD) || $pm->isSpectator($player)){
-			$event->setCancelled();
+			$event->cancel();
 
 			return;
 		}
@@ -144,14 +153,14 @@ class EventListener extends ArenaListener {
 
 			/** @var Player $damager */
 			if($pm->isTeammates($damager, $player)){
-				$event->setCancelled();
+				$event->cancel();
 
 				// Return the arrow to the original player.
-				if($isArrow) $damager->getInventory()->addItem(ItemFactory::get(ItemIds::ARROW));
+				if($isArrow) $damager->getInventory()->addItem(VanillaItems::ARROW());
 
 				return;
 			}elseif($pm->isSpectator($damager)){
-				$event->setCancelled();
+				$event->cancel();
 
 				return;
 			}else{
@@ -162,11 +171,11 @@ class EventListener extends ArenaListener {
 		}elseif($event instanceof EntityDamageByEntityEvent && ($damager = $event->getDamager()) instanceof Player){
 			/** @var Player $damager */
 			if($pm->isTeammates($damager, $player)){
-				$event->setCancelled();
+				$event->cancel();
 
 				return;
 			}elseif($pm->isSpectator($damager)){
-				$event->setCancelled();
+				$event->cancel();
 
 				return;
 			}else{
@@ -180,7 +189,7 @@ class EventListener extends ArenaListener {
 		// And for void damage, immediate damage
 		$health = $player->getHealth() - $event->getFinalDamage();
 		if($health <= 0 || $cause === EntityDamageEvent::CAUSE_VOID){
-			$event->setCancelled();
+			$event->cancel();
 
 			$entry = $this->logger->getEntry($player->getName(), $cause === EntityDamageEvent::CAUSE_VOID ? 8 : 3);
 			if($entry !== null && $entry->attackFrom !== null){
@@ -242,7 +251,7 @@ class EventListener extends ArenaListener {
 			$items = array_merge($player->getInventory()->getContents(), $player->getArmorInventory()->getContents());
 
 			foreach($items as $item){
-				$player->getLevel()->dropItem($player, $item);
+				$player->getWorld()->dropItem($player, $item);
 			}
 		}
 
