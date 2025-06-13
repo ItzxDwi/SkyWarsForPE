@@ -42,9 +42,8 @@ use pocketmine\utils\TextFormat;
 class SkyWarsTask extends ArenaTickTask {
 
 	/** @var int[] */
-	private $refillAverage;
-	/** @var int */
-	private $nextRefill = -1;
+	private array $refillAverage;
+	private int $nextRefill = -1;
 
 	public function __construct(ArenaImpl $arena){
 		parent::__construct($arena);
@@ -97,8 +96,9 @@ class SkyWarsTask extends ArenaTickTask {
 			foreach($winners as $rank => [$playerName, $kills]){
 				if($playerName !== "N/A"){
 					$command = $arena->winnersCommand[$rank] ?? [];
+					$server = Server::getInstance();
 					foreach($command as $cmd){
-						Server::getInstance()->dispatchCommand(new ConsoleCommandSender(), str_replace("%p", "\"" . $playerName . "\"", $cmd));
+						$server->dispatchCommand(new ConsoleCommandSender($server, $server->getLanguage()), str_replace("%p", "\"" . $playerName . "\"", $cmd));
 					}
 				}
 
