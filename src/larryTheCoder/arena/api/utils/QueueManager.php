@@ -31,12 +31,12 @@ declare(strict_types = 1);
 namespace larryTheCoder\arena\api\utils;
 
 
-use pocketmine\Player;
+use pocketmine\player\Player;
 
 class QueueManager {
 
 	/** @var Player[] */
-	private $playerQueue = [];
+	private array $playerQueue = [];
 
 	/**
 	 * Attempt to add player into the arena queue. This holds the player queue until the next tick.
