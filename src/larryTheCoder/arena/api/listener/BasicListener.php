@@ -39,7 +39,7 @@ use pocketmine\event\block\BlockPlaceEvent;
 use pocketmine\event\entity\EntityDamageEvent;
 use pocketmine\event\inventory\InventoryCloseEvent;
 use pocketmine\event\inventory\InventoryOpenEvent;
-use pocketmine\event\inventory\InventoryPickupItemEvent;
+use pocketmine\event\entity\EntityItemPickupEvent;
 use pocketmine\event\Listener;
 use pocketmine\event\player\PlayerChatEvent;
 use pocketmine\event\player\PlayerCommandPreprocessEvent;
@@ -49,9 +49,8 @@ use pocketmine\event\player\PlayerInteractEvent;
 use pocketmine\event\player\PlayerKickEvent;
 use pocketmine\event\player\PlayerMoveEvent;
 use pocketmine\event\player\PlayerQuitEvent;
-use pocketmine\inventory\PlayerInventory;
 use pocketmine\math\Vector3;
-use pocketmine\Player;
+use pocketmine\player\Player;
 
 /**
  * A singleton basic listener used to listen for appropriate events to all arenas
@@ -112,7 +111,7 @@ abstract class BasicListener implements Listener {
 		if($arena === null) return;
 
 		if($p->isSurvival() && $arena->getStatus() !== ArenaState::STATE_ARENA_RUNNING){
-			$e->setCancelled(true);
+			$e->cancel();
 
 			return;
 		}
@@ -134,7 +133,7 @@ abstract class BasicListener implements Listener {
 		if($arena === null) return;
 
 		if($p->isSurvival() && $arena->getStatus() !== ArenaState::STATE_ARENA_RUNNING){
-			$e->setCancelled(true);
+			$e->cancel();
 		}
 
 		$arena->getEventListener()->onBlockBreakEvent($e);
@@ -189,17 +188,17 @@ abstract class BasicListener implements Listener {
 		$arena->getEventListener()->onInventoryCloseEvent($event);
 	}
 
-	public function onItemPickupEvent(InventoryPickupItemEvent $event): void{
-		/** @var PlayerInventory $inv */
+	public function onItemPickupEvent(EntityItemPickupEvent $event): void{
 		$inv = $event->getInventory();
-		/** @var Player $p */
-		$p = $inv->getHolder();
+		$p = $event->getEntity();
+
+		if(!$p instanceof Player) return;
 
 		$arena = $this->getArena($p);
 		if($arena === null) return;
 
-		if($arena->getEventListener()->onItemPickupEvent($p, $event->getItem()->getItem())){
-			$event->setCancelled();
+		if($arena->getEventListener()->onItemPickupEvent($p, $event->getItem())){
+			$event->cancel();
 		}
 	}
 
@@ -210,7 +209,7 @@ abstract class BasicListener implements Listener {
 		if($arena === null) return;
 
 		if($arena->getEventListener()->onItemDropEvent($p, $event->getItem())){
-			$event->setCancelled();
+			$event->cancel();
 		}
 	}
 
@@ -231,7 +230,7 @@ abstract class BasicListener implements Listener {
 
 		// Cancel any events that are not related to state running.
 		if($arena->getStatus() != ArenaState::STATE_ARENA_RUNNING){
-			$event->setCancelled(true);
+			$event->cancel(true);
 
 			return;
 		}
@@ -283,24 +282,24 @@ abstract class BasicListener implements Listener {
 			if($item->equals(Arena::getLeaveItem())){
 				$arena->leaveArena($p);
 
-				$e->setCancelled();
+				$e->cancel();
 			}elseif($item->equals(Arena::getKitSelector())){
 				$arena->onKitSelection($p);
 
-				$e->setCancelled();
+				$e->cancel();
 			}elseif($item->equals(Arena::getSpectatorItem())){
 				$arena->onSpectatorSelection($p);
 
-				$e->setCancelled();
+				$e->cancel();
 			}elseif($item->equals(Arena::getRejoinItem())){
 				$arena->onRejoinSelection($p);
 
-				$e->setCancelled();
+				$e->cancel();
 			}
 
 
 			if(!$e->isCancelled() && $arena->getEventListener()->onPlayerInteractEvent($e)){
-				$e->setCancelled();
+				$e->cancel();
 			}
 		}
 	}
