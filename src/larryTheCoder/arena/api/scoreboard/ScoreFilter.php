@@ -32,9 +32,10 @@ namespace larryTheCoder\arena\api\scoreboard;
 
 use Ifera\ScoreHud\libs\jackmd\scorefactory\ScoreFactory;
 use Ifera\ScoreHud\ScoreHud;
+use Ifera\ScoreHud\session\PlayerManager;
 use Ifera\ScoreHud\utils\HelperUtils;
 use larryTheCoder\arena\api\Arena;
-use pocketmine\Player;
+use pocketmine\player\Player;
 use pocketmine\Server;
 use pocketmine\utils\Config;
 
@@ -50,8 +51,6 @@ class ScoreFilter extends Internal {
 	public function __construct(Arena $arena, Config $defaultConf){
 		parent::__construct($arena, $defaultConf);
 
-		// TODO: Check for v6.0, event driven scoreboards, wooo. For now lets stick to v5.2.0
-		//       which is literally discarding or ignoring this plugin functionality.
 		$scoreboard = Server::getInstance()->getPluginManager()->getPlugin("ScoreHud");
 		if($scoreboard !== null && $scoreboard instanceof ScoreHud){
 			$this->scoreboard = $scoreboard;
@@ -61,6 +60,7 @@ class ScoreFilter extends Internal {
 	public function removePlayer(Player $player): void{
 		if($this->scoreboard !== null){
 			HelperUtils::destroy($player);
+			PlayerManager::getNonNull($player)->handle();
 		}
 
 		parent::removePlayer($player);
@@ -68,7 +68,7 @@ class ScoreFilter extends Internal {
 
 	public function addPlayer(Player $player): void{
 		if($this->scoreboard !== null){
-			ScoreFactory::removeScore($player);
+			ScoreFactory::removeObjective($player);
 			HelperUtils::disable($player);
 		}
 
