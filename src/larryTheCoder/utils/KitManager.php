@@ -37,10 +37,10 @@ use larryTheCoder\arena\api\translation\TranslationContainer as TC;
 use larryTheCoder\forms\elements\Button;
 use larryTheCoder\forms\FormQueue;
 use larryTheCoder\forms\MenuForm;
-use pocketmine\command\ConsoleCommandSender;
+use pocketmine\console\ConsoleCommandSender;
 use pocketmine\event\Listener;
-use pocketmine\item\Item;
-use pocketmine\Player;
+use pocketmine\item\ItemTypeIds;
+use pocketmine\player\Player;
 use pocketmine\Server;
 use pocketmine\utils\TextFormat;
 
@@ -137,7 +137,7 @@ class KitManager implements Listener {
 		$invCount = count($invSlots);
 
 		foreach($armorSlots as $key => $armorSlot){
-			if($playerArmor[$key]->getId() !== Item::AIR){
+			if($playerArmor[$key]->getTypeId() !== ItemTypeIds::AIR){
 				$invCount++;
 			}
 		}
@@ -149,7 +149,7 @@ class KitManager implements Listener {
 
 		foreach($armorSlots as $key => $armorSlot){
 			if($kit->doOverrideArmor()) $playerArmorInv->setItem($key, $armorSlot);
-			elseif($playerArmorInv->getItem($key)->getId() !== Item::AIR) $playerInv->addItem($armorSlot);
+			elseif($playerArmorInv->getItem($key)->getTypeId() !== ItemTypeIds::AIR) $playerInv->addItem($armorSlot);
 			else $playerArmorInv->setItem($key, $armorSlot);
 		}
 
@@ -157,8 +157,9 @@ class KitManager implements Listener {
 			$player->addEffect($effect);
 		}
 
+    $server = Server::getInstance();
 		foreach($kit->getCommands() as $command){
-			Server::getInstance()->dispatchCommand(new ConsoleCommandSender(), LangUtils::replaceVariables($command, ["{PLAYER}" => $player->getName(), "{NICK}" => $player->getDisplayName()]));
+			$server->dispatchCommand(new ConsoleCommandSender($server, $server->getLanguage()), LangUtils::replaceVariables($command, ["{PLAYER}" => $player->getName(), "{NICK}" => $player->getDisplayName()]));
 		}
 	}
 }
