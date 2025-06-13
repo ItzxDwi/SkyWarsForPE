@@ -40,6 +40,7 @@ use larryTheCoder\arena\api\task\CompressionAsyncTask;
 use larryTheCoder\arena\api\utils\QueueManager;
 use larryTheCoder\database\SkyWarsDatabase;
 use larryTheCoder\worker\LevelAsyncPool;
+use pmmp\thread\ThreadSafeArray;
 use pocketmine\block\utils\DyeColor;
 use pocketmine\block\VanillaBlocks;
 use pocketmine\item\Item;
@@ -265,7 +266,7 @@ abstract class Arena implements ShutdownSequence {
 
 	final public function resetWorld(): void{
 		// The sequence of deleting the arena.
-		$task = new AsyncDirectoryDelete([$this->lobbyWorld, $this->world], function(){
+		$task = new AsyncDirectoryDelete(ThreadSafeArray::fromArray([$this->lobbyWorld, $this->world]), function(){
 			$this->setFlags(self::ARENA_OFFLINE_MODE, true);
 
 			$this->world = null;
@@ -297,7 +298,7 @@ abstract class Arena implements ShutdownSequence {
 		if(is_file($this->plugin->getDataFolder() . 'arenas/worlds/')) return;
 		if(!file_exists($toPath)) @mkdir($toPath, 0755);
 
-		$task = new CompressionAsyncTask([$fromPath, $toPath, false], function() use ($onStart){
+		$task = new CompressionAsyncTask(ThreadSafeArray::fromArray([$fromPath, $toPath, false]), function() use ($onStart){
 			if($this->lobbyName !== null && $onStart){
 				Server::getInstance()->getWorldManager()->loadWorld($this->lobbyName);
 
